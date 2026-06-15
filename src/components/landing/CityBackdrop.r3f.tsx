@@ -8,7 +8,7 @@ import { CityField } from '@/components/r3f/CityField.r3f'
  */
 export function CityBackdrop({ progress }: { progress: RefObject<number> }) {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10">
+    <div className="pointer-events-none fixed inset-0 z-0">
       <Canvas
         dpr={[1, 1.6]}
         camera={{ fov: 62, near: 0.1, far: 1200, position: [0, 125, 100] }}

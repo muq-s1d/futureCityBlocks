@@ -1,5 +1,6 @@
 import Noise from '@/components/reactbits/Noise/Noise'
 import Particles from '@/components/reactbits/Particles/Particles'
+import PixelTrail from '@/components/reactbits/PixelTrail/PixelTrail'
 import { PALETTE } from '@/constants/palette'
 
 /**
@@ -22,6 +23,18 @@ export function Atmosphere() {
           alphaParticles
           moveParticlesOnHover={false}
           disableRotation={false}
+        />
+      </div>
+
+      {/* Pixel trail following the cursor, over the city but under the content */}
+      <div className="absolute inset-0 opacity-70">
+        <PixelTrail
+          gridSize={60}
+          trailSize={0.1}
+          maxAge={260}
+          interpolate={5}
+          color={PALETTE.cyan}
+          gooeyFilter={{ id: 'fc-goo', strength: 2 }}
         />
       </div>
 

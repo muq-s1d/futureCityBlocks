@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { gsap, ScrollTrigger } from '@/lib/gsap'
+import TargetCursor from '@/components/reactbits/TargetCursor/TargetCursor'
 import { CityBackdrop } from '@/components/landing/CityBackdrop.r3f'
 import { Atmosphere } from '@/components/landing/Atmosphere'
 import { HudFrame } from '@/components/landing/HudFrame'
@@ -16,8 +17,11 @@ export default function LandingPage() {
   useEffect(() => {
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+    // hero · districts · pitch · cta — snap settles on each (GSAP, not CSS snap).
+    const SECTION_COUNT = 4
+
     const ctx = gsap.context(() => {
-      // Whole-page scroll 0→1 drives the city descent.
+      // Whole-page scroll 0→1 drives the city descent, snapping to section points.
       ScrollTrigger.create({
         trigger: rootRef.current!,
         start: 'top top',
@@ -25,6 +29,15 @@ export default function LandingPage() {
         onUpdate: (self) => {
           scrollProgress.current = self.progress
         },
+        snap: prefersReduced
+          ? undefined
+          : {
+              snapTo: (value) =>
+                Math.round(value * (SECTION_COUNT - 1)) / (SECTION_COUNT - 1),
+              duration: { min: 0.2, max: 0.5 },
+              delay: 0.05,
+              ease: 'power2.inOut',
+            },
       })
 
       if (prefersReduced) {
@@ -67,6 +80,7 @@ export default function LandingPage() {
 
   return (
     <div ref={rootRef} className="relative overflow-x-hidden">
+      <TargetCursor targetSelector=".cursor-target" hideDefaultCursor spinDuration={3} />
       <CityBackdrop progress={scrollProgress} />
       <Atmosphere />
       <HudFrame progress={scrollProgress} />
@@ -83,7 +97,7 @@ export default function LandingPage() {
       {/* Skip control for impatient users (immersive-pattern best practice). */}
       <button
         onClick={skip}
-        className="fixed right-6 bottom-12 z-40 cursor-pointer font-mono text-[0.65rem] tracking-[0.3em] text-cyan/50 uppercase transition-colors hover:text-cyan focus-visible:text-cyan focus-visible:outline-none"
+        className="cursor-target text-readable fixed right-6 bottom-12 z-40 cursor-pointer font-mono text-xs tracking-[0.3em] text-cyan/70 uppercase transition-colors hover:text-cyan focus-visible:text-cyan focus-visible:outline-none"
       >
         Skip intro ↓
       </button>

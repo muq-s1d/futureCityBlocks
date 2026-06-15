@@ -6,7 +6,7 @@ export function HeroSection() {
     <section className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <p
         data-reveal
-        className="mb-10 font-mono text-[0.7rem] tracking-[0.5em] text-cyan/70 uppercase"
+        className="text-readable mb-10 font-mono text-sm tracking-[0.5em] text-cyan/85 uppercase"
       >
         {HERO.kicker}
       </p>
@@ -19,13 +19,13 @@ export function HeroSection() {
 
       <p
         data-reveal
-        className="mt-10 max-w-xl font-mono text-base leading-relaxed text-cyan/80 sm:text-lg"
+        className="text-readable mt-10 max-w-2xl font-mono text-lg leading-relaxed text-cyan sm:text-xl"
       >
         {HERO.tagline}
       </p>
 
       <div data-reveal className="mt-20 flex flex-col items-center gap-3">
-        <span className="font-mono text-[0.65rem] tracking-[0.4em] text-cyan/50 uppercase">
+        <span className="text-readable font-mono text-xs tracking-[0.4em] text-cyan/70 uppercase">
           {HERO.scrollHint}
         </span>
         <span className="h-12 w-px animate-pulse bg-gradient-to-b from-cyan/60 to-transparent" />

@@ -10,7 +10,7 @@ export function CtaSection() {
     <section className="relative flex min-h-screen flex-col items-center justify-center gap-12 px-6 text-center">
       <p
         data-reveal
-        className="font-mono text-[0.7rem] tracking-[0.5em] text-cyan/60 uppercase"
+        className="text-readable font-mono text-sm tracking-[0.5em] text-cyan/80 uppercase"
       >
         street level reached
       </p>
@@ -26,13 +26,14 @@ export function CtaSection() {
           accent="magenta"
           onClick={() => navigate('/auth')}
           aria-label="Enter the city — continue to sign up"
+          className="cursor-target"
         >
           <ShinyText text="Enter the City" speed={3} color={PALETTE.magenta} shineColor={PALETTE.cyan} />
           <span aria-hidden>→</span>
         </NeonButton>
       </div>
 
-      <p data-reveal className="font-mono text-xs text-muted">
+      <p data-reveal className="text-readable font-mono text-sm text-cyan/60">
         no wallet · no install · just build
       </p>
     </section>
