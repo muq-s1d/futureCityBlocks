@@ -1,0 +1,28 @@
+/*
+ * Design tokens — single source of truth for the FutureCity palette & type.
+ * Values are locked by docs/spec.md. No component may hardcode these hexes;
+ * always consume via Tailwind utilities (bg-void, text-cyan, ...) or var(--color-*).
+ *
+ * Tailwind v4 @theme: each entry below emits BOTH a :root CSS variable
+ * (e.g. --color-void) AND a matching utility class (bg-void / text-void / ...).
+ */
+@theme {
+  /* Palette */
+  --color-void: #0a0a0f;
+  --color-cyan: #00ffe7;
+  --color-magenta: #ff2d78;
+  --color-amber: #ffd700;
+  --color-purple: #1a0033;
+  --color-surface: #0f0f1a;
+  --color-border: #1e1e3a;
+  --color-muted: #3a3a5c;
+
+  /* Typography */
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-ui: 'Inter', sans-serif;
+
+  /* Glow utilities — exposed as shadow-glow-cyan / shadow-glow-magenta */
+  --shadow-glow-cyan: 0 0 20px #00ffe780;
+  --shadow-glow-magenta: 0 0 20px #ff2d7880;
+}
