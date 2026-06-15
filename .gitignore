@@ -16,6 +16,9 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Local planning docs — kept out of the repo
+docs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
