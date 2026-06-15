@@ -1,0 +1,40 @@
+import { useNavigate } from 'react-router-dom'
+import GlitchText from '@/components/reactbits/GlitchText/GlitchText'
+import ShinyText from '@/components/reactbits/ShinyText/ShinyText'
+import { NeonButton } from '@/components/ui/NeonButton'
+import { PALETTE } from '@/constants/palette'
+
+export function CtaSection() {
+  const navigate = useNavigate()
+  return (
+    <section className="relative flex min-h-screen flex-col items-center justify-center gap-12 px-6 text-center">
+      <p
+        data-reveal
+        className="font-mono text-[0.7rem] tracking-[0.5em] text-cyan/60 uppercase"
+      >
+        street level reached
+      </p>
+
+      <div data-reveal>
+        <GlitchText speed={0.5} className="font-display">
+          ENTER THE CITY
+        </GlitchText>
+      </div>
+
+      <div data-reveal>
+        <NeonButton
+          accent="magenta"
+          onClick={() => navigate('/auth')}
+          aria-label="Enter the city — continue to sign up"
+        >
+          <ShinyText text="Enter the City" speed={3} color={PALETTE.magenta} shineColor={PALETTE.cyan} />
+          <span aria-hidden>→</span>
+        </NeonButton>
+      </div>
+
+      <p data-reveal className="font-mono text-xs text-muted">
+        no wallet · no install · just build
+      </p>
+    </section>
+  )
+}

@@ -48,6 +48,62 @@ button {
   font-family: inherit;
 }
 
+/* ----- Animation tokens (Tailwind v4 emits animate-* utilities) ----- */
+@theme {
+  /* GlitchText (reactbits) reads --before/--after-duration from inline style. */
+  --animate-glitch-before: glitch var(--before-duration, 3s) infinite linear alternate-reverse;
+  --animate-glitch-after: glitch var(--after-duration, 2s) infinite linear alternate-reverse;
+  --animate-flicker: flicker 4s infinite steps(1);
+  --animate-scan: scan 8s linear infinite;
+}
+
+@keyframes glitch {
+  0% { clip-path: inset(20% 0 50% 0); }
+  5% { clip-path: inset(10% 0 60% 0); }
+  10% { clip-path: inset(15% 0 55% 0); }
+  15% { clip-path: inset(25% 0 35% 0); }
+  20% { clip-path: inset(30% 0 40% 0); }
+  25% { clip-path: inset(40% 0 20% 0); }
+  30% { clip-path: inset(10% 0 60% 0); }
+  35% { clip-path: inset(15% 0 55% 0); }
+  40% { clip-path: inset(25% 0 35% 0); }
+  45% { clip-path: inset(30% 0 40% 0); }
+  50% { clip-path: inset(20% 0 50% 0); }
+  55% { clip-path: inset(10% 0 60% 0); }
+  60% { clip-path: inset(15% 0 55% 0); }
+  65% { clip-path: inset(25% 0 35% 0); }
+  70% { clip-path: inset(30% 0 40% 0); }
+  75% { clip-path: inset(40% 0 20% 0); }
+  80% { clip-path: inset(20% 0 50% 0); }
+  85% { clip-path: inset(10% 0 60% 0); }
+  90% { clip-path: inset(15% 0 55% 0); }
+  95% { clip-path: inset(25% 0 35% 0); }
+  100% { clip-path: inset(30% 0 40% 0); }
+}
+
+/* Subtle neon sign flicker for HUD/accent text. */
+@keyframes flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.4; }
+}
+
+/* Scanline sweep travelling down a surface. */
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* Honor reduced-motion: kill the decorative loops. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 /* Custom scrollbar to match the cyberpunk surface */
 ::-webkit-scrollbar {
   width: 10px;
