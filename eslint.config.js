@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Vendored reactbits.dev components live as-is; don't hold third-party
+  // code to our project lint rules (purity, set-state-in-effect, etc.).
+  globalIgnores(['dist', 'src/components/reactbits/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
