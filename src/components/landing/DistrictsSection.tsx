@@ -11,8 +11,10 @@ const COLOR = {
 export function DistrictsSection() {
   return (
     <section className="relative mx-auto flex min-h-screen max-w-5xl flex-col justify-center px-6 py-28">
-      {/* Frosted panel keeps the editorial rows readable over the skyline. */}
-      <div data-reveal className="hud-panel rounded-sm px-6 py-8 sm:px-10 sm:py-10">
+      {/* Frosted panel keeps the editorial rows readable over the skyline.
+          No data-reveal opacity fade here — it would hide the DecryptedText
+          scramble (which fires on view) before it becomes visible. */}
+      <div className="hud-panel rounded-sm px-6 py-8 sm:px-10 sm:py-10">
         <p className="mb-2 font-mono text-sm tracking-[0.35em] text-magenta uppercase">
           // three districts · one grid
         </p>
@@ -22,7 +24,6 @@ export function DistrictsSection() {
           return (
             <article
               key={d.id}
-              data-reveal
               className="flex items-start gap-5 border-t border-border py-8 sm:gap-7"
             >
               <span className={`pt-1 font-mono text-base ${c.text}`}>{d.index}</span>
@@ -33,7 +34,7 @@ export function DistrictsSection() {
                     text={d.label}
                     animateOn="view"
                     sequential
-                    speed={38}
+                    speed={55}
                     maxIterations={14}
                     className={c.text}
                     encryptedClassName="text-muted"

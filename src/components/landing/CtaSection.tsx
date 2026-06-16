@@ -16,7 +16,7 @@ export function CtaSection() {
       </p>
 
       <div data-reveal>
-        <GlitchText speed={0.5} className="font-display">
+        <GlitchText speed={1.6} shadowIntensity={2} className="font-display">
           ENTER THE CITY
         </GlitchText>
       </div>

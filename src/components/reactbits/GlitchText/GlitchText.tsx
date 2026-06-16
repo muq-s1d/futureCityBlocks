@@ -5,6 +5,8 @@ interface GlitchTextProps {
   speed?: number;
   enableShadows?: boolean;
   enableOnHover?: boolean;
+  /** Chromatic-aberration offset in px. Lower = subtler glitch. */
+  shadowIntensity?: number;
   className?: string;
 }
 
@@ -20,14 +22,15 @@ const GlitchText: FC<GlitchTextProps> = ({
   speed = 0.5,
   enableShadows = true,
   enableOnHover = false,
+  shadowIntensity = 5,
   className = ''
 }) => {
   const inlineStyles: CustomCSSProperties = {
     '--after-duration': `${speed * 3}s`,
     '--before-duration': `${speed * 2}s`,
     // Palette-correct chromatic aberration (magenta / cyan from tokens.css).
-    '--after-shadow': enableShadows ? '-5px 0 #ff2d78' : 'none',
-    '--before-shadow': enableShadows ? '5px 0 #00ffe7' : 'none'
+    '--after-shadow': enableShadows ? `-${shadowIntensity}px 0 #ff2d78` : 'none',
+    '--before-shadow': enableShadows ? `${shadowIntensity}px 0 #00ffe7` : 'none'
   };
 
   const baseClasses = 'text-cyan text-[clamp(2rem,10vw,8rem)] font-black relative mx-auto select-none cursor-pointer';
