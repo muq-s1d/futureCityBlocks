@@ -1,25 +1,37 @@
 import { Suspense, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { CityField } from '@/components/r3f/CityField.r3f'
+import type { WorldStage } from '@/stores/worldStore'
 
 /**
- * Fixed full-viewport R3F canvas behind the landing content. The scroll-progress
- * ref drives the in-scene camera descent (see CityField). When the user enters
- * the access terminal we raise the canvas and enable pointer events so the in-
- * world 3D form (AuthKiosk) is clickable.
+ * Fixed full-viewport R3F canvas behind the landing content — and the single
+ * persistent world for the whole flow. The scroll-progress ref drives the city
+ * descent; the approach / toCity / toPlot refs blend the camera through the
+ * kiosk, storefront and plot legs (see CityField). When the user enters we raise
+ * the canvas and enable pointer events so the in-world 3D forms are clickable.
  */
 export function CityBackdrop({
   progress,
   approach,
+  toCity,
+  toStore,
+  toPlot,
+  stage,
   interactive,
   authActive,
   onAuthSuccess,
+  onEnterPlot,
 }: {
   progress: RefObject<number>
   approach: RefObject<number>
+  toCity: RefObject<number>
+  toStore: RefObject<number>
+  toPlot: RefObject<number>
+  stage: WorldStage
   interactive: boolean
   authActive: boolean
   onAuthSuccess: () => void
+  onEnterPlot: () => void
 }) {
   return (
     <div
@@ -36,8 +48,13 @@ export function CityBackdrop({
           <CityField
             progress={progress}
             approach={approach}
+            toCity={toCity}
+            toStore={toStore}
+            toPlot={toPlot}
+            stage={stage}
             authActive={authActive}
             onAuthSuccess={onAuthSuccess}
+            onEnterPlot={onEnterPlot}
           />
         </Suspense>
       </Canvas>

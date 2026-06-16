@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { gsap, ScrollTrigger } from '@/lib/gsap'
 import TargetCursor from '@/components/reactbits/TargetCursor/TargetCursor'
 import { CityBackdrop } from '@/components/landing/CityBackdrop.r3f'
@@ -9,13 +8,20 @@ import { HeroSection } from '@/components/landing/HeroSection'
 import { DistrictsSection } from '@/components/landing/DistrictsSection'
 import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
+import { useWorldStore } from '@/stores/worldStore'
 
 export default function LandingPage() {
-  const navigate = useNavigate()
+  const stage = useWorldStore((s) => s.stage)
+  const setStage = useWorldStore((s) => s.setStage)
   // Mutated by ScrollTrigger, read by the R3F camera each frame (no re-render).
   const scrollProgress = useRef(0)
-  // 0→1 fly-to-sign blend, animated by GSAP on "Enter the City".
+  // Camera blend refs (0→1), animated by GSAP as the user moves through the flow:
+  // approach → kiosk, toCity → deep fly-in, toStore → 90° pan to storefront,
+  // toPlot → their plot.
   const approach = useRef(0)
+  const toCity = useRef(0)
+  const toStore = useRef(0)
+  const toPlot = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLElement>(null)
   // Imperative jump-to-section, wired up inside the effect, used by Skip intro.
@@ -195,6 +201,7 @@ export default function LandingPage() {
     goToRef.current(3) // make sure the descent is complete (street level)
     enteringRef.current = true
     setEntering(true)
+    setStage('auth')
     if (reduced()) {
       approach.current = 1
       return
@@ -202,17 +209,54 @@ export default function LandingPage() {
     gsap.to(approach, { current: 1, duration: 2.6, ease: 'power2.inOut' })
   }
 
-  // Return from the terminal back to the landing page.
+  // Auth success: don't leave the canvas — keep flying the same camera. Two
+  // phases: fly DEEP down the highway into the city (toCity), settle, then turn
+  // ~90° left to face the storefront (toStore).
+  const handleAuthSuccess = () => {
+    setStage('dashboard')
+    if (reduced()) {
+      toCity.current = 1
+      toStore.current = 1
+      return
+    }
+    gsap.to(toCity, {
+      current: 1,
+      duration: 2.2,
+      ease: 'power2.inOut',
+      onComplete: () => {
+        gsap.to(toStore, { current: 1, duration: 1.5, ease: 'power2.inOut' })
+      },
+    })
+  }
+
+  // Picked a district / entered plot: fly from the storefront to the user's plot.
+  const handleEnterPlot = () => {
+    setStage('plot')
+    if (reduced()) {
+      toPlot.current = 1
+      return
+    }
+    gsap.to(toPlot, { current: 1, duration: 2.4, ease: 'power2.inOut' })
+  }
+
+  // Return all the way back to the landing page from any stage.
   const handleBack = () => {
     const done = () => {
       enteringRef.current = false
       setEntering(false)
+      setStage('landing')
     }
     if (reduced()) {
       approach.current = 0
+      toCity.current = 0
+      toStore.current = 0
+      toPlot.current = 0
       done()
       return
     }
+    gsap.to(toPlot, { current: 0, duration: 1.4, ease: 'power2.inOut' })
+    gsap.to(toStore, { current: 0, duration: 1.4, ease: 'power2.inOut' })
+    gsap.to(toCity, { current: 0, duration: 1.4, ease: 'power2.inOut' })
     gsap.to(approach, { current: 0, duration: 1.4, ease: 'power2.inOut', onComplete: done })
   }
 
@@ -222,9 +266,14 @@ export default function LandingPage() {
       <CityBackdrop
         progress={scrollProgress}
         approach={approach}
+        toCity={toCity}
+        toStore={toStore}
+        toPlot={toPlot}
+        stage={stage}
         interactive={entering}
-        authActive={entering}
-        onAuthSuccess={() => navigate('/city', { replace: true })}
+        authActive={stage === 'auth'}
+        onAuthSuccess={handleAuthSuccess}
+        onEnterPlot={handleEnterPlot}
       />
       <Atmosphere fading={entering} />
       {!entering && <HudFrame progress={scrollProgress} />}
@@ -249,6 +298,9 @@ export default function LandingPage() {
           ← back to the landing
         </button>
       )}
+
+      {/* The storefront dashboard (district chooser) is rendered in-world on the
+          façade — see StorefrontDashboard inside CityField. */}
 
       {/* Skip control for impatient users (immersive-pattern best practice). */}
       {!entering && (
