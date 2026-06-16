@@ -8,6 +8,7 @@ import { HeroSection } from '@/components/landing/HeroSection'
 import { DistrictsSection } from '@/components/landing/DistrictsSection'
 import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
+import { PlotHud } from '@/components/city/PlotHud'
 import { useWorldStore } from '@/stores/worldStore'
 
 export default function LandingPage() {
@@ -239,6 +240,17 @@ export default function LandingPage() {
     gsap.to(toPlot, { current: 1, duration: 2.4, ease: 'power2.inOut' })
   }
 
+  // From the plot view, fly back out to the storefront/dashboard (not all the
+  // way to landing).
+  const handleBackToCity = () => {
+    setStage('dashboard')
+    if (reduced()) {
+      toPlot.current = 0
+      return
+    }
+    gsap.to(toPlot, { current: 0, duration: 1.8, ease: 'power2.inOut' })
+  }
+
   // Return all the way back to the landing page from any stage.
   const handleBack = () => {
     const done = () => {
@@ -301,6 +313,11 @@ export default function LandingPage() {
 
       {/* The storefront dashboard (district chooser) is rendered in-world on the
           façade — see StorefrontDashboard inside CityField. */}
+
+      {/* Plot view: arrived at the user's plot (in-world marker + this HUD). */}
+      {stage === 'plot' && (
+        <PlotHud onBackToCity={handleBackToCity} onBackToLanding={handleBack} />
+      )}
 
       {/* Skip control for impatient users (immersive-pattern best practice). */}
       {!entering && (

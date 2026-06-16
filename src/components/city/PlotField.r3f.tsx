@@ -161,17 +161,28 @@ export function PlotField({
       )}
 
       {owned && (
-        <mesh ref={beaconRef} position={[plotWorldX(owned.grid_x), 16, plotWorldZ(owned.grid_z)]}>
-          <cylinderGeometry args={[1.3, 0.4, 32, 12, 1, true]} />
-          <meshBasicMaterial
-            color={PALETTE.cyan}
-            transparent
-            opacity={0.3}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
+        <group>
+          {/* Light shaft marking the owned plot from afar. */}
+          <mesh ref={beaconRef} position={[plotWorldX(owned.grid_x), 16, plotWorldZ(owned.grid_z)]}>
+            <cylinderGeometry args={[1.3, 0.4, 32, 12, 1, true]} />
+            <meshBasicMaterial
+              color={PALETTE.cyan}
+              transparent
+              opacity={0.3}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
+          {/* Steady outline of the empty plot you've arrived at. */}
+          <mesh
+            position={[plotWorldX(owned.grid_x), 0.6, plotWorldZ(owned.grid_z)]}
+            renderOrder={2}
+          >
+            <boxGeometry args={[TILE + 0.8, 1.2, TILE + 0.8]} />
+            <meshBasicMaterial color={PALETTE.cyan} wireframe transparent opacity={0.55} toneMapped={false} />
+          </mesh>
+        </group>
       )}
     </group>
   )
