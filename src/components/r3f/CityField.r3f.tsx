@@ -2,6 +2,8 @@ import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
+import { HighwaySign } from '@/components/r3f/HighwaySign.r3f'
+import { AuthKiosk } from '@/components/r3f/AuthKiosk.r3f'
 
 /**
  * Procedural instanced skyline for the landing descent.
@@ -32,7 +34,17 @@ interface Building {
   tint: THREE.Color
 }
 
-export function CityField({ progress }: { progress: RefObject<number> }) {
+export function CityField({
+  progress,
+  approach,
+  authActive,
+  onAuthSuccess,
+}: {
+  progress: RefObject<number>
+  approach: RefObject<number>
+  authActive: boolean
+  onAuthSuccess: () => void
+}) {
   const bodyRef = useRef<THREE.InstancedMesh>(null!)
   const crownRef = useRef<THREE.InstancedMesh>(null!)
   const { camera } = useThree()
@@ -42,6 +54,7 @@ export function CityField({ progress }: { progress: RefObject<number> }) {
     // Deterministic LCG so the skyline is stable across reloads.
     let seed = 1337
     const rand = () => {
+      // Local deterministic LCG, consumed entirely within this useMemo.
       seed = (seed * 1664525 + 1013904223) >>> 0
       return seed / 4294967296
     }
@@ -91,6 +104,13 @@ export function CityField({ progress }: { progress: RefObject<number> }) {
     () => ({ pos: new THREE.Vector3(0, 7, 6), tgt: new THREE.Vector3(0, 18, -150) }),
     [],
   )
+  // "Enter the City" pulls the camera back onto the open approach highway and
+  // frames the roadside access terminal (AuthKiosk) at an angle on the right,
+  // with the highway and distant skyline visible past it.
+  const sign = useMemo(
+    () => ({ pos: new THREE.Vector3(5, 6.2, 40), tgt: new THREE.Vector3(12.8, 5.7, 30.2) }),
+    [],
+  )
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
   const tmpTgt = useMemo(() => new THREE.Vector3(), [])
 
@@ -102,6 +122,15 @@ export function CityField({ progress }: { progress: RefObject<number> }) {
     const e = p * p * (3 - 2 * p) // smoothstep
     tmpPos.lerpVectors(start.pos, end.pos, e)
     tmpTgt.lerpVectors(start.tgt, end.tgt, e)
+
+    // Fly-to-sign blend layered on top of the scroll pose (approach 0→1).
+    const a = approach.current ?? 0
+    if (a > 0.0001) {
+      const ae = a * a * (3 - 2 * a)
+      tmpPos.lerp(sign.pos, ae)
+      tmpTgt.lerp(sign.tgt, ae)
+    }
+
     camera.position.copy(tmpPos)
     camera.lookAt(tmpTgt)
   })
@@ -128,6 +157,9 @@ export function CityField({ progress }: { progress: RefObject<number> }) {
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
+
+      <HighwaySign />
+      <AuthKiosk active={authActive} onSuccess={onAuthSuccess} />
     </>
   )
 }

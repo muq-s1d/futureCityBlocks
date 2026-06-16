@@ -8,9 +8,16 @@ import { PALETTE } from '@/constants/palette'
  * vignette. The texture here is what keeps the look from reading as a generic
  * smooth-gradient page.
  */
-export function Atmosphere() {
+export function Atmosphere({ fading = false }: { fading?: boolean }) {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+    // While the camera flies to the access terminal the canvas rises to z-20 and
+    // would instantly hide these layers; instead we lift the atmosphere above it
+    // (pointer-events stay off) and fade it out over the approach.
+    <div
+      className={`pointer-events-none fixed inset-0 overflow-hidden transition-opacity duration-[2400ms] ease-out ${
+        fading ? 'z-30 opacity-0' : 'z-0 opacity-100'
+      }`}
+    >
       {/* A4 — ambient drifting particles. Kept sparse + small so they read as
           faint flecks of light, not a blue haze over the city. */}
       <div className="absolute inset-0 opacity-35">

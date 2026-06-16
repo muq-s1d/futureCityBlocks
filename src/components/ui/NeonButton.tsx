@@ -1,10 +1,12 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 type Accent = 'cyan' | 'magenta'
 
 interface NeonButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   accent?: Accent
   children: ReactNode
+  /** React 19 ref-as-prop (e.g. autofocus in a dialog). */
+  ref?: Ref<HTMLButtonElement>
 }
 
 const ACCENT: Record<Accent, string> = {

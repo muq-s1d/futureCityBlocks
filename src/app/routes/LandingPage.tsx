@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { gsap, ScrollTrigger } from '@/lib/gsap'
 import TargetCursor from '@/components/reactbits/TargetCursor/TargetCursor'
 import { CityBackdrop } from '@/components/landing/CityBackdrop.r3f'
@@ -10,12 +11,21 @@ import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
 
 export default function LandingPage() {
+  const navigate = useNavigate()
   // Mutated by ScrollTrigger, read by the R3F camera each frame (no re-render).
   const scrollProgress = useRef(0)
+  // 0→1 fly-to-sign blend, animated by GSAP on "Enter the City".
+  const approach = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLElement>(null)
   // Imperative jump-to-section, wired up inside the effect, used by Skip intro.
   const goToRef = useRef<(i: number) => void>(() => {})
+
+  // Approach state: locks scrolling while the camera flies to the access
+  // terminal. enteringRef mirrors `entering` for the (once-bound) scroll
+  // handlers.
+  const [entering, setEntering] = useState(false)
+  const enteringRef = useRef(false)
 
   useEffect(() => {
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -31,6 +41,7 @@ export default function LandingPage() {
     let animating = false
 
     const goTo = (i: number) => {
+      if (enteringRef.current) return // camera is flying to the sign — page is locked
       i = Math.max(0, Math.min(sections.length - 1, i))
       if (animating || i === index || !sections[i]) return
       index = i
@@ -175,29 +186,79 @@ export default function LandingPage() {
 
   const skip = () => goToRef.current(3)
 
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  // "Enter the City": settle at street level, then pull the camera back onto the
+  // approach highway and frame the 3D access terminal (AuthKiosk).
+  const handleEnter = () => {
+    if (enteringRef.current) return
+    goToRef.current(3) // make sure the descent is complete (street level)
+    enteringRef.current = true
+    setEntering(true)
+    if (reduced()) {
+      approach.current = 1
+      return
+    }
+    gsap.to(approach, { current: 1, duration: 2.6, ease: 'power2.inOut' })
+  }
+
+  // Return from the terminal back to the landing page.
+  const handleBack = () => {
+    const done = () => {
+      enteringRef.current = false
+      setEntering(false)
+    }
+    if (reduced()) {
+      approach.current = 0
+      done()
+      return
+    }
+    gsap.to(approach, { current: 0, duration: 1.4, ease: 'power2.inOut', onComplete: done })
+  }
+
   return (
     <div ref={rootRef} className="relative overflow-x-hidden">
       <TargetCursor targetSelector=".cursor-target" hideDefaultCursor spinDuration={3} />
-      <CityBackdrop progress={scrollProgress} />
-      <Atmosphere />
-      <HudFrame progress={scrollProgress} />
+      <CityBackdrop
+        progress={scrollProgress}
+        approach={approach}
+        interactive={entering}
+        authActive={entering}
+        onAuthSuccess={() => navigate('/city', { replace: true })}
+      />
+      <Atmosphere fading={entering} />
+      {!entering && <HudFrame progress={scrollProgress} />}
 
-      <main ref={mainRef} className="relative z-10">
+      <main ref={mainRef} className={`relative z-10 ${entering ? 'pointer-events-none' : ''}`}>
         <HeroSection />
         <DistrictsSection />
         <PitchSection />
         <div id="enter">
-          <CtaSection />
+          <CtaSection onEnter={handleEnter} />
         </div>
       </main>
 
+      {/* In-world access terminal: the sign-up / log-in form lives on the 3D
+          AuthKiosk (inside the canvas). Only the "back" control is a DOM
+          overlay sitting above it. */}
+      {entering && (
+        <button
+          onClick={handleBack}
+          className="cursor-target fixed bottom-10 left-1/2 z-50 -translate-x-1/2 font-mono text-xs tracking-[0.3em] text-cyan/60 uppercase transition-colors hover:text-cyan"
+        >
+          ← back to the landing
+        </button>
+      )}
+
       {/* Skip control for impatient users (immersive-pattern best practice). */}
-      <button
-        onClick={skip}
-        className="cursor-target text-readable fixed right-6 bottom-12 z-40 cursor-pointer font-mono text-xs tracking-[0.3em] text-cyan/70 uppercase transition-colors hover:text-cyan focus-visible:text-cyan focus-visible:outline-none"
-      >
-        Skip intro ↓
-      </button>
+      {!entering && (
+        <button
+          onClick={skip}
+          className="cursor-target text-readable fixed right-6 bottom-12 z-40 cursor-pointer font-mono text-xs tracking-[0.3em] text-cyan/70 uppercase transition-colors hover:text-cyan focus-visible:text-cyan focus-visible:outline-none"
+        >
+          Skip intro ↓
+        </button>
+      )}
     </div>
   )
 }

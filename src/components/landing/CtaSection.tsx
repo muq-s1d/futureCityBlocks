@@ -1,11 +1,9 @@
-import { useNavigate } from 'react-router-dom'
 import GlitchText from '@/components/reactbits/GlitchText/GlitchText'
 import ShinyText from '@/components/reactbits/ShinyText/ShinyText'
 import { NeonButton } from '@/components/ui/NeonButton'
 import { PALETTE } from '@/constants/palette'
 
-export function CtaSection() {
-  const navigate = useNavigate()
+export function CtaSection({ onEnter }: { onEnter: () => void }) {
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center gap-12 px-6 text-center">
       <p
@@ -24,7 +22,7 @@ export function CtaSection() {
       <div data-reveal>
         <NeonButton
           accent="magenta"
-          onClick={() => navigate('/auth')}
+          onClick={onEnter}
           aria-label="Enter the city — continue to sign up"
           className="cursor-target"
         >
