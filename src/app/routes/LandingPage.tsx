@@ -10,10 +10,13 @@ import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
 import { PlotHud } from '@/components/city/PlotHud'
 import { useWorldStore } from '@/stores/worldStore'
+import { useAuthStore } from '@/stores/authStore'
 
 export default function LandingPage() {
   const stage = useWorldStore((s) => s.stage)
   const setStage = useWorldStore((s) => s.setStage)
+  const user = useAuthStore((s) => s.user)
+  const initializing = useAuthStore((s) => s.initializing)
   // Mutated by ScrollTrigger, read by the R3F camera each frame (no re-render).
   const scrollProgress = useRef(0)
   // Camera blend refs (0→1), animated by GSAP as the user moves through the flow:
@@ -33,6 +36,27 @@ export default function LandingPage() {
   // handlers.
   const [entering, setEntering] = useState(false)
   const enteringRef = useRef(false)
+
+  // Returning sessions skip the landing + kiosk entirely. The first time the
+  // initial auth check resolves WITH a session, snap every camera leg to its end
+  // so the world opens already parked at the storefront dashboard. Runs once: a
+  // fresh in-flow kiosk login (initializing already false) never trips it, so its
+  // animated fly-in is preserved.
+  const initialAuthChecked = useRef(false)
+  useEffect(() => {
+    if (initialAuthChecked.current || initializing) return
+    initialAuthChecked.current = true
+    if (!user) return // no existing session → normal landing flow
+    scrollProgress.current = 1
+    approach.current = 1
+    toCity.current = 1
+    toStore.current = 1
+    toPlot.current = 0
+    enteringRef.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEntering(true)
+    setStage('dashboard')
+  }, [initializing, user, setStage])
 
   useEffect(() => {
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches

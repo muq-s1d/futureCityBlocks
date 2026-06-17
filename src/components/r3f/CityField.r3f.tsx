@@ -175,8 +175,12 @@ export function CityField({
   )
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
   const tmpTgt = useMemo(() => new THREE.Vector3(), [])
-  const plotPos = useMemo(() => new THREE.Vector3(), [])
-  const plotTgt = useMemo(() => new THREE.Vector3(), [])
+  // Plot fly-to is a two-leg route (staging → arrival); both poses are recomputed
+  // per frame from the owned plot, kept inside the tower-free neighborhood band.
+  const stagePos = useMemo(() => new THREE.Vector3(), [])
+  const stageTgt = useMemo(() => new THREE.Vector3(), [])
+  const arrivePos = useMemo(() => new THREE.Vector3(), [])
+  const arriveTgt = useMemo(() => new THREE.Vector3(), [])
 
   useFrame((_, dt) => {
     const target = progress.current ?? 0
@@ -211,11 +215,28 @@ export function CityField({
     if (pl > 0.0001 && ownedPlot) {
       const wx = plotWorldX(ownedPlot.grid_x) + CITY_OFFSET.x
       const wz = plotWorldZ(ownedPlot.grid_z) + CITY_OFFSET.z
-      plotPos.set(wx + 6, 24, wz + 40)
-      plotTgt.set(wx, 2, wz)
-      const ple = pl * pl * (3 - 2 * pl)
-      tmpPos.lerp(plotPos, ple)
-      tmpTgt.lerp(plotTgt, ple)
+      const side = wx < 0 ? -1 : 1
+      // The plots sit in the cleared band (z −150…−300). A straight line from the
+      // storefront to a near-row plot used to cross z=−150 into the skyline and
+      // skim other lots. Instead route in two legs that never leave the band:
+      //   leg 1 — pull back onto the highway corridor at the plot's depth, high up
+      //   leg 2 — descend laterally from the road onto the plot.
+      stagePos.set(side * 13, 20, wz)
+      stageTgt.set(wx, 1, wz)
+      arrivePos.set(wx - side * 12, 7, wz + 8)
+      arriveTgt.set(wx, 0.6, wz)
+
+      const leg1 = Math.min(pl / 0.5, 1)
+      const l1 = leg1 * leg1 * (3 - 2 * leg1)
+      tmpPos.lerp(stagePos, l1)
+      tmpTgt.lerp(stageTgt, l1)
+
+      if (pl > 0.5) {
+        const leg2 = (pl - 0.5) / 0.5
+        const l2 = leg2 * leg2 * (3 - 2 * leg2)
+        tmpPos.lerp(arrivePos, l2)
+        tmpTgt.lerp(arriveTgt, l2)
+      }
     }
 
     camera.position.copy(tmpPos)
