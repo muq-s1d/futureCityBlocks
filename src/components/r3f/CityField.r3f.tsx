@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
+import { PerformanceMonitor } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
 import { HighwaySign } from '@/components/r3f/HighwaySign.r3f'
@@ -7,11 +9,13 @@ import { AuthKiosk } from '@/components/r3f/AuthKiosk.r3f'
 import { PlotField, type ReserveRect } from '@/components/city/PlotField.r3f'
 import { Rain } from '@/components/city/Rain.r3f'
 import { Storefront } from '@/components/city/Storefront.r3f'
+import { StorefrontAtmosphere } from '@/components/city/StorefrontAtmosphere.r3f'
 import { StorefrontDashboard } from '@/components/city/StorefrontDashboard.r3f'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
 import { loadCityPlots } from '@/lib/city'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useQualityStore, useQualityCaps } from '@/stores/qualityStore'
 import type { WorldStage } from '@/stores/worldStore'
 
 /**
@@ -123,6 +127,8 @@ export function CityField({
   const timeOfDay = useCityStore((s) => s.timeOfDay)
   const weather = useCityStore((s) => s.weather)
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
+  const caps = useQualityCaps()
+  const downgrade = useQualityStore((s) => s.downgrade)
 
   // Day/night blend (0 = night, 1 = day): eased toward its target each frame and
   // applied to bg/fog/lights through refs, so toggling never re-renders the scene.
@@ -301,6 +307,10 @@ export function CityField({
 
   return (
     <>
+      {/* Runtime guardrail: if the framerate sags, step the quality tier down
+          (drops dpr + the heavy effects) so 60fps is preserved on weak hardware. */}
+      <PerformanceMonitor onDecline={() => downgrade()} />
+
       <color ref={bgRef} attach="background" args={[PALETTE.void]} />
       <fog ref={fogRef} attach="fog" args={[PALETTE.purple, 45, 300]} />
       <ambientLight ref={ambRef} intensity={0.28} />
@@ -335,6 +345,7 @@ export function CityField({
             />
           </group>
           <Storefront position={STOREFRONT_POS}>
+            <StorefrontAtmosphere />
             {stage === 'dashboard' && (
               <StorefrontDashboard ownedPlot={ownedPlot} onPick={onEnterPlot} />
             )}
@@ -347,6 +358,14 @@ export function CityField({
             </group>
           )}
         </>
+      )}
+
+      {/* Selective neon bloom — city stages only, so the landing descent keeps
+          its tuned look. Skipped entirely on the low tier. */}
+      {showCity && caps.bloom && (
+        <EffectComposer>
+          <Bloom mipmapBlur intensity={0.7} luminanceThreshold={0.55} luminanceSmoothing={0.2} />
+        </EffectComposer>
       )}
     </>
   )

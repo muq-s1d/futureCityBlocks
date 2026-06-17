@@ -1,6 +1,7 @@
 import { Suspense, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { CityField } from '@/components/r3f/CityField.r3f'
+import { useQualityCaps } from '@/stores/qualityStore'
 import type { WorldStage } from '@/stores/worldStore'
 
 /**
@@ -33,6 +34,7 @@ export function CityBackdrop({
   onAuthSuccess: () => void
   onEnterPlot: (districtId: string) => void
 }) {
+  const caps = useQualityCaps()
   return (
     <div
       className={`fixed inset-0 ${
@@ -40,7 +42,7 @@ export function CityBackdrop({
       }`}
     >
       <Canvas
-        dpr={[1, 1.6]}
+        dpr={[1, caps.dprMax]}
         camera={{ fov: 62, near: 0.1, far: 1200, position: [0, 125, 100] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
