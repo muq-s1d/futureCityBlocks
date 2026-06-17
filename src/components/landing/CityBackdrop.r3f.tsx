@@ -42,7 +42,7 @@ export function CityBackdrop({
       }`}
     >
       <Canvas
-        dpr={[1, caps.dprMax]}
+        dpr={caps.dprMax}
         camera={{ fov: 62, near: 0.1, far: 1200, position: [0, 125, 100] }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >

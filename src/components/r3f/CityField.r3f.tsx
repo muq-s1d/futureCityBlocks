@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
 import { HighwaySign } from '@/components/r3f/HighwaySign.r3f'
@@ -15,7 +14,7 @@ import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
 import { loadCityPlots } from '@/lib/city'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
-import { useQualityStore, useQualityCaps } from '@/stores/qualityStore'
+import { useQualityStore } from '@/stores/qualityStore'
 import type { WorldStage } from '@/stores/worldStore'
 
 /**
@@ -127,7 +126,6 @@ export function CityField({
   const timeOfDay = useCityStore((s) => s.timeOfDay)
   const weather = useCityStore((s) => s.weather)
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
-  const caps = useQualityCaps()
   const downgrade = useQualityStore((s) => s.downgrade)
 
   // Day/night blend (0 = night, 1 = day): eased toward its target each frame and
@@ -214,8 +212,11 @@ export function CityField({
   // Dashboard, phase 2 — turn ~90° left to face the storefront (perpendicular to
   // the highway). Position barely moves; the target swings left, so it reads as a
   // pan after the fly-in has settled.
+  // Façade front plane is at world x ≈ -12 (storefront at x −24, +12 local depth);
+  // back off far enough to frame the full multi-bay frontage, look at bay height,
+  // tilted down a touch so the wet floor reads in the foreground.
   const store = useMemo(
-    () => ({ pos: new THREE.Vector3(10, 9, -212), tgt: new THREE.Vector3(-24, 8, -212) }),
+    () => ({ pos: new THREE.Vector3(23, 14, -212), tgt: new THREE.Vector3(-7, 9.5, -212) }),
     [],
   )
   const tmpPos = useMemo(() => new THREE.Vector3(), [])
@@ -358,14 +359,6 @@ export function CityField({
             </group>
           )}
         </>
-      )}
-
-      {/* Selective neon bloom — city stages only, so the landing descent keeps
-          its tuned look. Skipped entirely on the low tier. */}
-      {showCity && caps.bloom && (
-        <EffectComposer>
-          <Bloom mipmapBlur intensity={0.7} luminanceThreshold={0.55} luminanceSmoothing={0.2} />
-        </EffectComposer>
       )}
     </>
   )

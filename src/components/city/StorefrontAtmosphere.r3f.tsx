@@ -86,7 +86,7 @@ function Steam({ count }: { count: number }) {
       const s = p.scale * (0.6 + p.phase * 0.9)
       sprite.scale.set(s, s, s)
       // Fade in then out across the rise.
-      ;(sprite.material as THREE.SpriteMaterial).opacity = Math.sin(p.phase * Math.PI) * 0.14
+      ;(sprite.material as THREE.SpriteMaterial).opacity = Math.sin(p.phase * Math.PI) * 0.32
     }
   })
 
@@ -113,27 +113,34 @@ export function StorefrontAtmosphere() {
 
   return (
     <group>
-      {/* Wet pavement slab, just in front of the façade (local +z is the street). */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, FLOOR_D / 2 - 4]} receiveShadow>
+      {/* Wet pavement slab, just in front of the façade (local +z is the street).
+          Lifted clear of the world void-ground plane (y=0) to avoid z-fighting. */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.08, FLOOR_D / 2 - 4]} receiveShadow>
         <planeGeometry args={[FLOOR_W, FLOOR_D]} />
         {caps.reflectiveFloor ? (
           <MeshReflectorMaterial
             resolution={caps.reflectorRes}
             mixBlur={1}
-            mixStrength={1.4}
+            mixStrength={2.2}
             blur={[300, 80]}
-            mirror={0.55}
+            mirror={0.85}
             depthScale={0.6}
             minDepthThreshold={0.3}
             maxDepthThreshold={1.2}
-            roughness={0.85}
-            metalness={0.6}
-            color="#05050b"
+            roughness={0.6}
+            metalness={0.7}
+            color="#0a0a16"
           />
         ) : (
-          <meshStandardMaterial color="#05050b" roughness={0.45} metalness={0.55} />
+          <meshStandardMaterial color="#0a0a16" roughness={0.95} metalness={0.2} />
         )}
       </mesh>
+
+      {/* Neon spill — colored light pooling on the wet street so the floor and its
+          reflections actually read at night (otherwise it just mirrors the void). */}
+      <pointLight position={[-8, 3, 16]} color={PALETTE.cyan} intensity={60} distance={46} decay={2} />
+      <pointLight position={[9, 3, 14]} color={PALETTE.magenta} intensity={55} distance={42} decay={2} />
+      <pointLight position={[0, 2.5, 30]} color={PALETTE.amber} intensity={40} distance={40} decay={2} />
 
       {caps.steam > 0 && <Steam count={caps.steam} />}
     </group>

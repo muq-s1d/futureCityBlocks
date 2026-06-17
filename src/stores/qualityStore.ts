@@ -30,7 +30,7 @@ export interface QualityCaps {
 
 export const QUALITY: Record<QualityTier, QualityCaps> = {
   low: {
-    dprMax: 1.25,
+    dprMax: 1,
     bloom: false,
     reflectiveFloor: false,
     reflectorRes: 0,
@@ -43,7 +43,7 @@ export const QUALITY: Record<QualityTier, QualityCaps> = {
     bloom: true,
     reflectiveFloor: true,
     reflectorRes: 256,
-    steam: 6,
+    steam: 12,
     vehicles: 2,
     animatedHolograms: true,
   },
@@ -52,7 +52,7 @@ export const QUALITY: Record<QualityTier, QualityCaps> = {
     bloom: true,
     reflectiveFloor: true,
     reflectorRes: 512,
-    steam: 14,
+    steam: 24,
     vehicles: 4,
     animatedHolograms: true,
   },
@@ -75,17 +75,22 @@ interface QualityStore {
   tier: QualityTier
   /** True once a runtime downgrade has fired, so we don't bounce back up. */
   pinned: boolean
+  /** True once the user picks a tier by hand — auto-downgrade then stays off. */
+  manual: boolean
+  /** User-chosen tier (HUD). Pins it so PerformanceMonitor won't override. */
   setTier: (tier: QualityTier) => void
-  /** Step down one tier (PerformanceMonitor onDecline). No-op at 'low'. */
+  /** Step down one tier (PerformanceMonitor onDecline). No-op at 'low' or manual. */
   downgrade: () => void
 }
 
 export const useQualityStore = create<QualityStore>((set) => ({
   tier: detectTier(),
   pinned: false,
-  setTier: (tier) => set({ tier }),
+  manual: false,
+  setTier: (tier) => set({ tier, pinned: true, manual: true }),
   downgrade: () =>
     set((s) => {
+      if (s.manual) return s
       const i = ORDER.indexOf(s.tier)
       return i > 0 ? { tier: ORDER[i - 1]!, pinned: true } : { pinned: true }
     }),
