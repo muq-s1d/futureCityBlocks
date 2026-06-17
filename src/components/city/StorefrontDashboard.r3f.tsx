@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
-import { DISTRICTS } from '@/constants/city'
+import { DISTRICTS, districtForColumn } from '@/constants/city'
 import { PALETTE } from '@/constants/palette'
 import { useCityStore } from '@/stores/cityStore'
 import type { Plot } from '@/types/db'
 
 /**
- * The "choose your district" chooser, rendered as true in-world 3D cards on the
- * storefront shopfront (mounted as a child of the rotated Storefront group, so
- * these are LOCAL coordinates — the façade faces +z here). Mirrors the AuthKiosk
- * pattern: neon-framed panels with troika Text, hover/click hit-tested in 3D.
- * Picking an available district flies the camera to the user's plot.
+ * The storefront chooser, rendered as true in-world 3D cards on the shopfront
+ * (mounted as a child of the rotated Storefront group, so these are LOCAL
+ * coordinates — the façade faces +z here). Mirrors the AuthKiosk pattern:
+ * neon-framed panels with troika Text, hover/click hit-tested in 3D.
+ *
+ * Two states:
+ *   - No plot yet → "choose a district" — one claimable card per district
+ *     (grayed when full); picking claims the oldest open plot there.
+ *   - Already own a plot → a single "enter your plot" card for that district;
+ *     no re-claim (one plot per user).
  */
 
 const MONO = '/fonts/ShareTechMono-Regular.ttf'
@@ -29,7 +34,7 @@ export function StorefrontDashboard({
   onPick,
 }: {
   ownedPlot: Plot | null
-  onPick: () => void
+  onPick: (districtId: string) => void
 }) {
   const plots = useCityStore((s) => s.plots)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -45,6 +50,39 @@ export function StorefrontDashboard({
   const step = CARD_W + CARD_GAP
   const startX = -((DISTRICTS.length - 1) / 2) * step
 
+  // Once the user owns a plot there's nothing left to choose: show a single
+  // "enter your plot" card for that plot's district instead of the claim grid.
+  if (ownedPlot) {
+    const d = districtForColumn(ownedPlot.grid_x)
+    return (
+      <group>
+        <Text
+          font={MONO}
+          fontSize={0.5}
+          letterSpacing={0.24}
+          color={PALETTE.muted}
+          anchorX="center"
+          anchorY="middle"
+          position={[0, CARD_Y + CARD_H / 2 + 1.1, CARD_Z]}
+        >
+          {`YOUR PLOT · #${ownedPlot.id}`}
+        </Text>
+        <DistrictCard
+          x={0}
+          label={d.label}
+          color={d.color}
+          available
+          subLabel={`PLOT #${ownedPlot.id}`}
+          actionLabel="ENTER ▸"
+          hovered={hovered === d.id}
+          onOver={() => setHovered(d.id)}
+          onOut={() => setHovered((h) => (h === d.id ? null : h))}
+          onPick={() => onPick(d.id)}
+        />
+      </group>
+    )
+  }
+
   return (
     <group>
       <Text
@@ -56,24 +94,25 @@ export function StorefrontDashboard({
         anchorY="middle"
         position={[0, CARD_Y + CARD_H / 2 + 1.1, CARD_Z]}
       >
-        {ownedPlot ? `PLOT #${ownedPlot.id} · CHOOSE A DISTRICT` : 'CHOOSE A DISTRICT'}
+        CHOOSE A DISTRICT
       </Text>
 
       {DISTRICTS.map((d, i) => {
         const open = openByDistrict[d.id] ?? 0
-        const available = open > 0 || Boolean(ownedPlot)
+        const available = open > 0
         return (
           <DistrictCard
             key={d.id}
             x={startX + i * step}
             label={d.label}
             color={d.color}
-            open={open}
             available={available}
+            subLabel={available ? `${open} OPEN` : 'FULL'}
+            actionLabel="CLAIM ▸"
             hovered={hovered === d.id}
             onOver={() => setHovered(d.id)}
             onOut={() => setHovered((h) => (h === d.id ? null : h))}
-            onPick={available ? onPick : undefined}
+            onPick={available ? () => onPick(d.id) : undefined}
           />
         )
       })}
@@ -85,8 +124,9 @@ function DistrictCard({
   x,
   label,
   color,
-  open,
   available,
+  subLabel,
+  actionLabel,
   hovered,
   onOver,
   onOut,
@@ -95,8 +135,9 @@ function DistrictCard({
   x: number
   label: string
   color: string
-  open: number
   available: boolean
+  subLabel: string
+  actionLabel: string
   hovered: boolean
   onOver: () => void
   onOut: () => void
@@ -164,7 +205,7 @@ function DistrictCard({
         anchorY="middle"
         position={[0, -1.4, 0.3]}
       >
-        {available ? `${open} OPEN` : 'FULL'}
+        {subLabel}
       </Text>
       {available && (
         <Text
@@ -177,7 +218,7 @@ function DistrictCard({
           position={[0, -2.7, 0.3]}
           fillOpacity={lit ? 1 : 0.6}
         >
-          CLAIM ▸
+          {actionLabel}
         </Text>
       )}
     </group>

@@ -18,7 +18,8 @@ export async function loadProfileAndPlot(userId: string): Promise<void> {
 }
 
 /** Sign up with email/password. Auto-confirm is on, so a session is returned
- *  immediately and the DB trigger has already created the profile + plot. */
+ *  immediately and the DB trigger has already created the profile. The user owns
+ *  no plot yet — they claim one from the storefront (see lib/city claimPlot). */
 export async function signUpWithEmail(
   email: string,
   password: string,

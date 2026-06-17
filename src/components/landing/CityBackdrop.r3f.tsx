@@ -31,7 +31,7 @@ export function CityBackdrop({
   interactive: boolean
   authActive: boolean
   onAuthSuccess: () => void
-  onEnterPlot: () => void
+  onEnterPlot: (districtId: string) => void
 }) {
   return (
     <div

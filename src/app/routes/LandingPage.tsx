@@ -11,11 +11,13 @@ import { CtaSection } from '@/components/landing/CtaSection'
 import { PlotHud } from '@/components/city/PlotHud'
 import { useWorldStore } from '@/stores/worldStore'
 import { useAuthStore } from '@/stores/authStore'
+import { claimPlot } from '@/lib/city'
 
 export default function LandingPage() {
   const stage = useWorldStore((s) => s.stage)
   const setStage = useWorldStore((s) => s.setStage)
   const user = useAuthStore((s) => s.user)
+  const ownedPlot = useAuthStore((s) => s.ownedPlot)
   const initializing = useAuthStore((s) => s.initializing)
   // Mutated by ScrollTrigger, read by the R3F camera each frame (no re-render).
   const scrollProgress = useRef(0)
@@ -254,14 +256,32 @@ export default function LandingPage() {
     })
   }
 
-  // Picked a district / entered plot: fly from the storefront to the user's plot.
-  const handleEnterPlot = () => {
+  // Picked a district card. If the user has no plot yet, claim the oldest open
+  // one in that district first; if they already own one, the pick just flies them
+  // there (claim_plot is idempotent). Then fly from the storefront to the plot.
+  const flyToPlot = () => {
     setStage('plot')
     if (reduced()) {
       toPlot.current = 1
       return
     }
     gsap.to(toPlot, { current: 1, duration: 2.4, ease: 'power2.inOut' })
+  }
+
+  const claimingRef = useRef(false)
+  const handleEnterPlot = (districtId: string) => {
+    if (claimingRef.current) return
+    if (ownedPlot) {
+      flyToPlot()
+      return
+    }
+    claimingRef.current = true
+    claimPlot(districtId)
+      .then(() => flyToPlot())
+      .catch((err) => console.error('claim_plot failed', err))
+      .finally(() => {
+        claimingRef.current = false
+      })
   }
 
   // From the plot view, fly back out to the storefront/dashboard (not all the

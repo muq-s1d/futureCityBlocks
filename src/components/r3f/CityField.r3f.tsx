@@ -88,7 +88,7 @@ export function CityField({
   stage: WorldStage
   authActive: boolean
   onAuthSuccess: () => void
-  onEnterPlot: () => void
+  onEnterPlot: (districtId: string) => void
 }) {
   const bodyRef = useRef<THREE.InstancedMesh>(null!)
   const crownRef = useRef<THREE.InstancedMesh>(null!)
