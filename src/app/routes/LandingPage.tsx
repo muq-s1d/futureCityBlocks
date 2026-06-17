@@ -9,6 +9,7 @@ import { DistrictsSection } from '@/components/landing/DistrictsSection'
 import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
 import { PlotHud } from '@/components/city/PlotHud'
+import { EnvHud } from '@/components/city/EnvHud'
 import { useWorldStore } from '@/stores/worldStore'
 import { useAuthStore } from '@/stores/authStore'
 import { claimPlot } from '@/lib/city'
@@ -354,6 +355,9 @@ export default function LandingPage() {
           ← back to the landing
         </button>
       )}
+
+      {/* Environment toggles (day/night + rain) while in the city. */}
+      {(stage === 'dashboard' || stage === 'plot') && <EnvHud />}
 
       {/* The storefront dashboard (district chooser) is rendered in-world on the
           façade — see StorefrontDashboard inside CityField. */}

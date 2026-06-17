@@ -5,6 +5,7 @@ import { PALETTE } from '@/constants/palette'
 import { HighwaySign } from '@/components/r3f/HighwaySign.r3f'
 import { AuthKiosk } from '@/components/r3f/AuthKiosk.r3f'
 import { PlotField, type ReserveRect } from '@/components/city/PlotField.r3f'
+import { Rain } from '@/components/city/Rain.r3f'
 import { Storefront } from '@/components/city/Storefront.r3f'
 import { StorefrontDashboard } from '@/components/city/StorefrontDashboard.r3f'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
@@ -45,6 +46,29 @@ const CITY_OFFSET = new THREE.Vector3(0, 0, 0)
 // (turned to face the road). The reserved rect keeps plot pads out from under it.
 const STOREFRONT_POS: [number, number, number] = [-24, 0, -212]
 const STOREFRONT_RESERVE: ReserveRect = { minX: -40, maxX: -8, minZ: -232, maxZ: -192 }
+
+// Night ↔ day atmosphere presets (t = 0 night, 1 day). NIGHT is exactly the
+// original static landing/world look, so the descent is unchanged; the in-city
+// HUD can blend toward DAY (GSAP-free: eased each frame through refs, no
+// re-renders), matching the City World Rules.
+const NIGHT = {
+  bg: new THREE.Color(PALETTE.void),
+  fog: new THREE.Color(PALETTE.purple),
+  fogNear: 45,
+  fogFar: 300,
+  amb: 0.28,
+  dir: 0.55,
+  dirColor: new THREE.Color(PALETTE.cyan),
+}
+const DAY = {
+  bg: new THREE.Color('#2a2140'),
+  fog: new THREE.Color('#3a2f55'),
+  fogNear: 80,
+  fogFar: 480,
+  amb: 0.66,
+  dir: 1.0,
+  dirColor: new THREE.Color('#ffd9a0'),
+}
 
 // Cheap deterministic hash → [0,1). Pure (no mutable seed), so it's safe to call
 // during render inside useMemo.
@@ -96,7 +120,22 @@ export function CityField({
   const damped = useRef(0)
 
   const plots = useCityStore((s) => s.plots)
+  const timeOfDay = useCityStore((s) => s.timeOfDay)
+  const weather = useCityStore((s) => s.weather)
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
+
+  // Day/night blend (0 = night, 1 = day): eased toward its target each frame and
+  // applied to bg/fog/lights through refs, so toggling never re-renders the scene.
+  const dn = useRef(timeOfDay === 'day' ? 1 : 0)
+  const dnTarget = useRef(timeOfDay === 'day' ? 1 : 0)
+  const ambRef = useRef<THREE.AmbientLight>(null!)
+  const dirRef = useRef<THREE.DirectionalLight>(null!)
+  const bgRef = useRef<THREE.Color>(null!)
+  const fogRef = useRef<THREE.Fog>(null!)
+
+  useEffect(() => {
+    dnTarget.current = timeOfDay === 'day' ? 1 : 0
+  }, [timeOfDay])
 
   // Pull the plot grid once the user has left the landing.
   useEffect(() => {
@@ -241,16 +280,31 @@ export function CityField({
 
     camera.position.copy(tmpPos)
     camera.lookAt(tmpTgt)
+
+    // Day/night: ease the blend and push it into bg/fog/lights (no re-render).
+    dn.current += (dnTarget.current - dn.current) * (1 - Math.exp(-2.2 * dt))
+    const t = dn.current
+    if (bgRef.current) bgRef.current.copy(NIGHT.bg).lerp(DAY.bg, t)
+    if (fogRef.current) {
+      fogRef.current.color.copy(NIGHT.fog).lerp(DAY.fog, t)
+      fogRef.current.near = THREE.MathUtils.lerp(NIGHT.fogNear, DAY.fogNear, t)
+      fogRef.current.far = THREE.MathUtils.lerp(NIGHT.fogFar, DAY.fogFar, t)
+    }
+    if (ambRef.current) ambRef.current.intensity = THREE.MathUtils.lerp(NIGHT.amb, DAY.amb, t)
+    if (dirRef.current) {
+      dirRef.current.intensity = THREE.MathUtils.lerp(NIGHT.dir, DAY.dir, t)
+      dirRef.current.color.copy(NIGHT.dirColor).lerp(DAY.dirColor, t)
+    }
   })
 
   const showCity = stage !== 'landing'
 
   return (
     <>
-      <color attach="background" args={[PALETTE.void]} />
-      <fog attach="fog" args={[PALETTE.purple, 45, 300]} />
-      <ambientLight intensity={0.28} />
-      <directionalLight position={[40, 90, 30]} intensity={0.55} color={PALETTE.cyan} />
+      <color ref={bgRef} attach="background" args={[PALETTE.void]} />
+      <fog ref={fogRef} attach="fog" args={[PALETTE.purple, 45, 300]} />
+      <ambientLight ref={ambRef} intensity={0.28} />
+      <directionalLight ref={dirRef} position={[40, 90, 30]} intensity={0.55} color={PALETTE.cyan} />
       <hemisphereLight args={[PALETTE.magenta, PALETTE.void, 0.35]} />
 
       <mesh rotation-x={-Math.PI / 2} position={[0, 0, -240]}>
@@ -285,6 +339,13 @@ export function CityField({
               <StorefrontDashboard ownedPlot={ownedPlot} onPick={onEnterPlot} />
             )}
           </Storefront>
+          {/* Rain is centred on the grid; offset it down −z to blanket the
+              highway approach and the neighborhood clearing where the plots are. */}
+          {weather === 'rain' && (
+            <group position={[0, 0, -150]}>
+              <Rain />
+            </group>
+          )}
         </>
       )}
     </>
