@@ -106,6 +106,8 @@ export function CityField({
   authActive,
   onAuthSuccess,
   onEnterPlot,
+  onSignOut,
+  onRequestDelete,
 }: {
   progress: RefObject<number>
   approach: RefObject<number>
@@ -116,6 +118,8 @@ export function CityField({
   authActive: boolean
   onAuthSuccess: () => void
   onEnterPlot: (districtId: string) => void
+  onSignOut: () => void
+  onRequestDelete: () => void
 }) {
   const bodyRef = useRef<THREE.InstancedMesh>(null!)
   const crownRef = useRef<THREE.InstancedMesh>(null!)
@@ -348,7 +352,12 @@ export function CityField({
           <Storefront position={STOREFRONT_POS}>
             <StorefrontAtmosphere />
             {stage === 'dashboard' && (
-              <StorefrontDashboard ownedPlot={ownedPlot} onPick={onEnterPlot} />
+              <StorefrontDashboard
+                ownedPlot={ownedPlot}
+                onPick={onEnterPlot}
+                onSignOut={onSignOut}
+                onRequestDelete={onRequestDelete}
+              />
             )}
           </Storefront>
           {/* Rain is centred on the grid; offset it down −z to blanket the

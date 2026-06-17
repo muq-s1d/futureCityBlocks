@@ -10,9 +10,11 @@ import { PitchSection } from '@/components/landing/PitchSection'
 import { CtaSection } from '@/components/landing/CtaSection'
 import { PlotHud } from '@/components/city/PlotHud'
 import { EnvHud } from '@/components/city/EnvHud'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useWorldStore } from '@/stores/worldStore'
 import { useAuthStore } from '@/stores/authStore'
 import { claimPlot } from '@/lib/city'
+import { signOut, deleteAccount } from '@/lib/auth'
 
 export default function LandingPage() {
   const stage = useWorldStore((s) => s.stage)
@@ -296,6 +298,40 @@ export default function LandingPage() {
     gsap.to(toPlot, { current: 0, duration: 1.8, ease: 'power2.inOut' })
   }
 
+  // Snap the world straight back to the landing page (no fly-out). Used after the
+  // user signs out or deletes their account — the session is gone, so there's
+  // nothing to animate back through.
+  const resetToLanding = () => {
+    enteringRef.current = false
+    setEntering(false)
+    approach.current = 0
+    toCity.current = 0
+    toStore.current = 0
+    toPlot.current = 0
+    scrollProgress.current = 0
+    window.scrollTo(0, 0)
+    setStage('landing')
+  }
+
+  const handleSignOut = () => {
+    void signOut().finally(resetToLanding)
+  }
+
+  // Delete is irreversible → confirm via the HTML modal (the 3D button just opens
+  // it). On confirm, delete the account then drop back to the landing.
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const handleConfirmDelete = () => {
+    setDeleteBusy(true)
+    deleteAccount()
+      .then(() => {
+        setDeleteOpen(false)
+        resetToLanding()
+      })
+      .catch((err) => console.error('delete_user failed', err))
+      .finally(() => setDeleteBusy(false))
+  }
+
   // Return all the way back to the landing page from any stage.
   const handleBack = () => {
     const done = () => {
@@ -331,6 +367,8 @@ export default function LandingPage() {
         authActive={stage === 'auth'}
         onAuthSuccess={handleAuthSuccess}
         onEnterPlot={handleEnterPlot}
+        onSignOut={handleSignOut}
+        onRequestDelete={() => setDeleteOpen(true)}
       />
       <Atmosphere fading={entering} />
       {!entering && <HudFrame progress={scrollProgress} />}
@@ -358,6 +396,21 @@ export default function LandingPage() {
 
       {/* Environment toggles (day/night + rain) while in the city. */}
       {(stage === 'dashboard' || stage === 'plot') && <EnvHud />}
+
+      {/* Delete-account confirmation (triggered from the in-world Account terminal). */}
+      <ConfirmDialog
+        open={deleteOpen}
+        danger
+        busy={deleteBusy}
+        title="Delete account?"
+        confirmLabel="Delete forever"
+        cancelLabel="Keep account"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => !deleteBusy && setDeleteOpen(false)}
+      >
+        This permanently deletes your account and releases your plot back to the
+        city. This cannot be undone.
+      </ConfirmDialog>
 
       {/* The storefront dashboard (district chooser) is rendered in-world on the
           façade — see StorefrontDashboard inside CityField. */}

@@ -22,6 +22,8 @@ export function CityBackdrop({
   authActive,
   onAuthSuccess,
   onEnterPlot,
+  onSignOut,
+  onRequestDelete,
 }: {
   progress: RefObject<number>
   approach: RefObject<number>
@@ -33,6 +35,8 @@ export function CityBackdrop({
   authActive: boolean
   onAuthSuccess: () => void
   onEnterPlot: (districtId: string) => void
+  onSignOut: () => void
+  onRequestDelete: () => void
 }) {
   const caps = useQualityCaps()
   return (
@@ -57,6 +61,8 @@ export function CityBackdrop({
             authActive={authActive}
             onAuthSuccess={onAuthSuccess}
             onEnterPlot={onEnterPlot}
+            onSignOut={onSignOut}
+            onRequestDelete={onRequestDelete}
           />
         </Suspense>
       </Canvas>
