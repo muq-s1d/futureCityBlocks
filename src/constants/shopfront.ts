@@ -8,8 +8,8 @@ import { PALETTE } from '@/constants/palette'
 export const SHOPFRONT = {
   width: 60,
   front: 12, // front plane of the building / frame
-  backZ: 7, // recessed interior back wall
-  contentZ: 8.9, // where window displays sit (deep in the recess)
+  backZ: 2, // recessed interior back wall (deep, so the holo can fully turn)
+  contentZ: 8.2, // where window displays sit (deep in the recess)
   glassZ: 11.3, // glazing plane
   sill: 2,
   head: 19.5,
