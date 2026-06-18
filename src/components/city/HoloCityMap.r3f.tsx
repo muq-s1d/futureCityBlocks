@@ -6,6 +6,7 @@ import { CITY_CONFIG, DISTRICTS, districtForColumn } from '@/constants/city'
 import { PALETTE } from '@/constants/palette'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
 import { useQualityCaps } from '@/stores/qualityStore'
+import { useStorefrontStore } from '@/stores/storefrontStore'
 import type { Plot } from '@/types/db'
 
 /**
@@ -60,6 +61,7 @@ export function HoloCityMap({
   const caps = useQualityCaps()
   const animated = caps.animatedHolograms
   const [hover, setHover] = useState<string | null>(null)
+  const setFocus = useStorefrontStore((s) => s.setFocus)
 
   const ownedDistrict = ownedPlot ? districtForColumn(ownedPlot.grid_x).id : null
 
@@ -102,13 +104,21 @@ export function HoloCityMap({
 
   const spin = useRef<THREE.Group>(null)
   const radar = useRef<THREE.Mesh>(null)
+  const scan = useRef<THREE.Mesh>(null)
   useFrame((state) => {
+    const t = state.clock.elapsedTime
     // Slow yaw sway (always — cheap, never stops when the quality tier drops).
-    if (spin.current) spin.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.28) * SWAY
+    if (spin.current) spin.current.rotation.y = Math.sin(t * 0.28) * SWAY
     if (animated && radar.current) {
-      const s = (state.clock.elapsedTime % 4) / 4 // 0→1 radar wipe
+      const s = (t % 4) / 4 // 0→1 radar wipe
       radar.current.scale.set(s * HALF_X * 1.3, s * HALF_X * 1.3, 1)
       ;(radar.current.material as THREE.MeshBasicMaterial).opacity = (1 - s) * 0.22
+    }
+    // Hologram scanline sweeping up the map face (in the map plane's depth axis).
+    if (animated && scan.current) {
+      const s = (t * 0.5) % 1
+      scan.current.position.z = -HALF_Z + s * HALF_Z * 2
+      ;(scan.current.material as THREE.MeshBasicMaterial).opacity = Math.sin(s * Math.PI) * 0.3
     }
   })
 
@@ -153,6 +163,28 @@ export function HoloCityMap({
             </mesh>
           )}
 
+          {/* Holographic scanlines: faint static lines + one bright sweeping bar,
+              both lying in the map plane. Animated tiers only (cheap, but it's the
+              "live projection" tell). */}
+          {animated && (
+            <group>
+              {Array.from({ length: 14 }).map((_, i) => (
+                <mesh
+                  key={i}
+                  position={[0, 0.005, -HALF_Z + ((i + 0.5) / 14) * HALF_Z * 2]}
+                  rotation-x={-Math.PI / 2}
+                >
+                  <planeGeometry args={[HALF_X * 2.1, 0.04]} />
+                  <meshBasicMaterial color={PALETTE.cyan} transparent opacity={0.07} toneMapped={false} />
+                </mesh>
+              ))}
+              <mesh ref={scan} position={[0, 0.02, 0]} rotation-x={-Math.PI / 2}>
+                <planeGeometry args={[HALF_X * 2.1, 0.5]} />
+                <meshBasicMaterial color={PALETTE.cyan} transparent opacity={0.25} toneMapped={false} />
+              </mesh>
+            </group>
+          )}
+
           {/* 200 lot pads */}
           <instancedMesh
             ref={padRef}
@@ -188,8 +220,14 @@ export function HoloCityMap({
             color={d.color}
             active={can}
             hovered={hover === d.id}
-            onOver={() => can && setHover(d.id)}
-            onOut={() => setHover((h) => (h === d.id ? null : h))}
+            onOver={() => {
+              if (can) setHover(d.id)
+              setFocus('myplots')
+            }}
+            onOut={() => {
+              setHover((h) => (h === d.id ? null : h))
+              setFocus(null)
+            }}
             onClick={can ? () => onPick(d.id) : undefined}
           />
         )

@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
+import { forwardRef, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
+import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
 import { SHOPFRONT } from '@/constants/shopfront'
+import { StorefrontSignage } from '@/components/city/StorefrontSignage.r3f'
+import { StorefrontAdBoard } from '@/components/city/StorefrontAdBoard.r3f'
+import { useStorefrontStore, type WindowId } from '@/stores/storefrontStore'
 
 /**
  * The city storefront: a real recessed shopfront in the ground floor of a dark
@@ -98,8 +104,14 @@ export function Storefront({
           (typeof SHOPFRONT.windows)[keyof typeof SHOPFRONT.windows],
         ][]
       ).map(([id, win]) => (
-        <Window key={id} x={win.x} w={win.w} accent={win.accent} label={SECTION_LABEL[id]} />
+        <Window key={id} id={id} x={win.x} w={win.w} accent={win.accent} label={SECTION_LABEL[id]} />
       ))}
+
+      {/* Headline blade + reflection-feeding neon shapes. */}
+      <StorefrontSignage />
+
+      {/* Animated holographic advertisement board over the left pier. */}
+      <StorefrontAdBoard />
 
       {/* Marquee on the fascia */}
       <Text
@@ -150,9 +162,33 @@ function Pier({ x, w }: { x: number; w: number }) {
 }
 
 /** One display window: a recessed reveal, faint glazing, a neon mullion frame and
- *  an etched section sign on the transom. Contents come from the dashboard. */
-function Window({ x, w, accent, label }: { x: number; w: number; accent: string; label: string }) {
+ *  an etched section sign on the transom. Contents come from the dashboard.
+ *  Engaging a window (storefrontStore.focus) brightens it and dims the others —
+ *  the highlight eases each frame through refs, so no re-render. */
+function Window({ id, x, w, accent, label }: { id: WindowId; x: number; w: number; accent: string; label: string }) {
   const h = head - sill
+  const focus = useStorefrontStore((s) => s.focus)
+
+  // Target highlight multiplier: this window picked → bright, another picked → dim.
+  const target = focus === id ? 1.7 : focus ? 0.32 : 1
+
+  const lightRef = useRef<THREE.PointLight>(null)
+  const tintRef = useRef<THREE.MeshBasicMaterial>(null)
+  const frameRef = useRef<THREE.Group>(null)
+  const mult = useRef(1)
+  useFrame((_, dt) => {
+    mult.current += (target - mult.current) * (1 - Math.exp(-6 * dt))
+    const m = mult.current
+    if (lightRef.current) lightRef.current.intensity = 48 * m
+    if (tintRef.current) tintRef.current.opacity = 0.12 * Math.min(m, 1.8)
+    const frameOpacity = THREE.MathUtils.clamp(0.85 * (m < 1 ? m + 0.2 : Math.min(m, 1.25)), 0.25, 1)
+    if (frameRef.current) {
+      for (const bar of frameRef.current.children) {
+        ;((bar as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = frameOpacity
+      }
+    }
+  })
+
   return (
     <group position={[x, winMidY, 0]}>
       {/* Even interior tint on the back wall — a flat soft colour so the recess
@@ -160,19 +196,19 @@ function Window({ x, w, accent, label }: { x: number; w: number; accent: string;
           doesn't z-fight it. */}
       <mesh position={[0, 0, backZ + 0.4]}>
         <planeGeometry args={[w - 0.4, h - 0.4]} />
-        <meshBasicMaterial color={accent} transparent opacity={0.12} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial ref={tintRef} color={accent} transparent opacity={0.12} depthWrite={false} toneMapped={false} />
       </mesh>
       {/* Soft frontal wash — placed well in front of the glass so its falloff is
           gentle across the whole window (an even glow, not a blob). Reads as the
           shop's light spilling onto the frontage. */}
-      <pointLight position={[0, 1, FRONT + 8]} color={accent} intensity={48} distance={60} decay={2} />
+      <pointLight ref={lightRef} position={[0, 1, FRONT + 8]} color={accent} intensity={48} distance={60} decay={2} />
       {/* Faint tinted glass. */}
       <mesh position={[0, 0, SHOPFRONT.glassZ]}>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial color={accent} transparent opacity={0.05} depthWrite={false} />
       </mesh>
       {/* Neon mullion frame around the opening (flush with the front). */}
-      <WindowFrame w={w} h={h} z={FRONT - 0.05} color={accent} />
+      <WindowFrame ref={frameRef} w={w} h={h} z={FRONT - 0.05} color={accent} />
       {/* Section sign on the transom bar. */}
       <mesh position={[0, h / 2 + 0.2, FRONT - 0.1]}>
         <boxGeometry args={[w, 0.9, 0.5]} />
@@ -195,20 +231,22 @@ function Window({ x, w, accent, label }: { x: number; w: number; accent: string;
   )
 }
 
-function WindowFrame({ w, h, z, color }: { w: number; h: number; z: number; color: string }) {
-  const t = 0.14
-  const bar = (args: [number, number, number], pos: [number, number, number]) => (
-    <mesh position={pos}>
-      <boxGeometry args={args} />
-      <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0.85} />
-    </mesh>
-  )
-  return (
-    <group position={[0, 0, z]}>
-      {bar([w, t, 0.15], [0, h / 2, 0])}
-      {bar([w, t, 0.15], [0, -h / 2, 0])}
-      {bar([t, h, 0.15], [-w / 2, 0, 0])}
-      {bar([t, h, 0.15], [w / 2, 0, 0])}
-    </group>
-  )
-}
+const WindowFrame = forwardRef<THREE.Group, { w: number; h: number; z: number; color: string }>(
+  function WindowFrame({ w, h, z, color }, ref) {
+    const t = 0.14
+    const bar = (args: [number, number, number], pos: [number, number, number]) => (
+      <mesh position={pos}>
+        <boxGeometry args={args} />
+        <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0.85} />
+      </mesh>
+    )
+    return (
+      <group ref={ref} position={[0, 0, z]}>
+        {bar([w, t, 0.15], [0, h / 2, 0])}
+        {bar([w, t, 0.15], [0, -h / 2, 0])}
+        {bar([t, h, 0.15], [-w / 2, 0, 0])}
+        {bar([t, h, 0.15], [w / 2, 0, 0])}
+      </group>
+    )
+  },
+)

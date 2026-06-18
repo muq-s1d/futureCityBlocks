@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import { PALETTE } from '@/constants/palette'
@@ -6,6 +6,7 @@ import { SHOPFRONT } from '@/constants/shopfront'
 import { HoloCityMap } from '@/components/city/HoloCityMap.r3f'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useStorefrontStore } from '@/stores/storefrontStore'
 import type { Plot } from '@/types/db'
 
 /**
@@ -35,6 +36,10 @@ export function StorefrontDashboard({
   const plots = useCityStore((s) => s.plots)
   const user = useAuthStore((s) => s.user)
   const { account, myplots, soon } = SHOPFRONT.windows
+
+  // Clear any window focus when the dashboard leaves (a stale focus would keep a
+  // window brightened/dimmed while the structural façade stays mounted).
+  useEffect(() => () => useStorefrontStore.getState().setFocus(null), [])
 
   return (
     <group>
@@ -111,7 +116,8 @@ function AccountDisplay({
   )
 }
 
-/** A flat terminal button: a neon-tinted bar that brightens on hover. */
+/** A flat terminal button: a neon-tinted bar that brightens on hover. Hovering it
+ *  also focuses the Account window (brighten it, dim the rest). */
 function TermButton({
   y,
   label,
@@ -124,17 +130,20 @@ function TermButton({
   onClick: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const setFocus = useStorefrontStore((s) => s.setFocus)
   return (
     <group
       position={[0, y, 0.15]}
       onPointerOver={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation()
         setHover(true)
+        setFocus('account')
         document.body.style.cursor = 'pointer'
       }}
       onPointerOut={(e: ThreeEvent<PointerEvent>) => {
         e.stopPropagation()
         setHover(false)
+        setFocus(null)
         document.body.style.cursor = 'auto'
       }}
       onClick={(e: ThreeEvent<MouseEvent>) => {
@@ -185,8 +194,24 @@ function ButtonFrame({ w, h, color, opacity }: { w: number; h: number; color: st
 /** "Opening soon" window — a closed roller shutter with a lock readout. */
 function SoonDisplay({ w }: { w: number }) {
   const slats = 9
+  const setFocus = useStorefrontStore((s) => s.setFocus)
   return (
     <group>
+      {/* Invisible hover region (no controls here) so the window can be focused. */}
+      <mesh
+        position={[0, 0, 1]}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+          e.stopPropagation()
+          setFocus('soon')
+        }}
+        onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+          e.stopPropagation()
+          setFocus(null)
+        }}
+      >
+        <planeGeometry args={[w, 14]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       {Array.from({ length: slats }).map((_, i) => (
         <mesh key={i} position={[0, 6.5 - i * 1.5, 0]}>
           <boxGeometry args={[w - 1.2, 1.2, 0.2]} />
