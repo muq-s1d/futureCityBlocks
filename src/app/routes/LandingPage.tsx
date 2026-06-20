@@ -11,10 +11,17 @@ import { CtaSection } from '@/components/landing/CtaSection'
 import { PlotHud } from '@/components/city/PlotHud'
 import { EnvHud } from '@/components/city/EnvHud'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { BuilderHud } from '@/components/builder/BuilderHud'
+import { BuilderPauseMenu } from '@/components/builder/BuilderPauseMenu'
+import { AssetLibraryPanel } from '@/components/builder/AssetLibraryPanel'
 import { useWorldStore } from '@/stores/worldStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useBuilderStore } from '@/stores/builderStore'
+import { usePlotObjects } from '@/hooks/usePlotObjects'
 import { claimPlot } from '@/lib/city'
+import { placeAssetOnPlot } from '@/lib/assets'
 import { signOut, deleteAccount } from '@/lib/auth'
+import type { Asset } from '@/types/db'
 
 export default function LandingPage() {
   const stage = useWorldStore((s) => s.stage)
@@ -31,6 +38,8 @@ export default function LandingPage() {
   const toCity = useRef(0)
   const toStore = useRef(0)
   const toPlot = useRef(0)
+  // toBuilder → fly from the plot into the first-person builder (and back out).
+  const toBuilder = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLElement>(null)
   // Imperative jump-to-section, wired up inside the effect, used by Skip intro.
@@ -41,6 +50,19 @@ export default function LandingPage() {
   // handlers.
   const [entering, setEntering] = useState(false)
   const enteringRef = useRef(false)
+
+  // Builder + asset-placement state. placedObjects renders on the plot (and as
+  // context inside the builder); refreshed on plot change and after a placement.
+  const { objects: placedObjects, refresh: refreshPlotObjects } = usePlotObjects(
+    ownedPlot?.id ?? null,
+  )
+  // Hides PlotHud during the plot→builder fly-in (stage is still 'plot' then).
+  const [enteringBuilder, setEnteringBuilder] = useState(false)
+  // Asset placement: open the library in "place" mode, arm an asset, then click
+  // the plot ground (PlotGroundPicker) to drop it.
+  const [placeLibraryOpen, setPlaceLibraryOpen] = useState(false)
+  const [placing, setPlacing] = useState(false)
+  const armedAsset = useRef<Asset | null>(null)
 
   // Returning sessions skip the landing + kiosk entirely. The first time the
   // initial auth check resolves WITH a session, snap every camera leg to its end
@@ -298,6 +320,64 @@ export default function LandingPage() {
     gsap.to(toPlot, { current: 0, duration: 1.8, ease: 'power2.inOut' })
   }
 
+  // ── Voxel builder ──────────────────────────────────────────────────────────
+  // Enter from the plot: start with a fresh scratch buffer, fly in (CityField
+  // drives toBuilder while stage is still 'plot'), then hand the camera to the
+  // FPS controller by flipping to 'builder' once the fly-in lands.
+  const handleEnterBuilder = () => {
+    const b = useBuilderStore.getState()
+    b.clearAll()
+    b.resetRuntime()
+    setEnteringBuilder(true)
+    if (reduced()) {
+      toBuilder.current = 1
+      setStage('builder')
+      return
+    }
+    gsap.to(toBuilder, {
+      current: 1,
+      duration: 1.6,
+      ease: 'power2.inOut',
+      onComplete: () => setStage('builder'),
+    })
+  }
+
+  // Exit back to the plot: drop the FPS controller (stage → 'plot') so CityField
+  // reclaims the camera at the toBuilder=1 waypoint, then ease toBuilder→0 home.
+  const handleExitBuilder = () => {
+    const b = useBuilderStore.getState()
+    b.resetRuntime()
+    b.clearAll()
+    setEnteringBuilder(false)
+    setStage('plot')
+    void refreshPlotObjects()
+    if (reduced()) {
+      toBuilder.current = 0
+      return
+    }
+    gsap.to(toBuilder, { current: 0, duration: 1.4, ease: 'power2.inOut' })
+  }
+
+  // ── Asset placement on the plot ──────────────────────────────────────────────
+  const armPlacement = (asset: Asset) => {
+    armedAsset.current = asset
+    setPlaceLibraryOpen(false)
+    setPlacing(true)
+  }
+  const cancelPlacement = () => {
+    armedAsset.current = null
+    setPlacing(false)
+  }
+  const handleGroundPick = (x: number, z: number) => {
+    const asset = armedAsset.current
+    if (!asset || !ownedPlot) return
+    setPlacing(false)
+    armedAsset.current = null
+    placeAssetOnPlot(ownedPlot.id, asset.id, x, 0, z)
+      .then(() => refreshPlotObjects())
+      .catch((err) => console.error('placeAssetOnPlot failed', err))
+  }
+
   // Snap the world straight back to the landing page (no fly-out). Used after the
   // user signs out or deletes their account — the session is gone, so there's
   // nothing to animate back through.
@@ -308,7 +388,11 @@ export default function LandingPage() {
     toCity.current = 0
     toStore.current = 0
     toPlot.current = 0
+    toBuilder.current = 0
     scrollProgress.current = 0
+    setEnteringBuilder(false)
+    setPlacing(false)
+    armedAsset.current = null
     window.scrollTo(0, 0)
     setStage('landing')
   }
@@ -334,6 +418,10 @@ export default function LandingPage() {
 
   // Return all the way back to the landing page from any stage.
   const handleBack = () => {
+    setEnteringBuilder(false)
+    setPlacing(false)
+    armedAsset.current = null
+    toBuilder.current = 0
     const done = () => {
       enteringRef.current = false
       setEntering(false)
@@ -362,13 +450,17 @@ export default function LandingPage() {
         toCity={toCity}
         toStore={toStore}
         toPlot={toPlot}
+        toBuilder={toBuilder}
         stage={stage}
         interactive={entering}
         authActive={stage === 'auth'}
+        placedObjects={placedObjects}
+        placing={placing}
         onAuthSuccess={handleAuthSuccess}
         onEnterPlot={handleEnterPlot}
         onSignOut={handleSignOut}
         onRequestDelete={() => setDeleteOpen(true)}
+        onGroundPick={handleGroundPick}
       />
       <Atmosphere fading={entering} />
       {!entering && <HudFrame progress={scrollProgress} />}
@@ -394,8 +486,44 @@ export default function LandingPage() {
         </button>
       )}
 
-      {/* Environment toggles (day/night + rain) while in the city. */}
+      {/* Environment toggles (day/night + rain) while in the city. Not in the
+          builder — the builder has its own HUD and pointer-lock controls. */}
       {(stage === 'dashboard' || stage === 'plot') && <EnvHud />}
+
+      {/* First-person voxel builder overlays (crosshair/hotbar + pause menu). */}
+      {stage === 'builder' && (
+        <>
+          <BuilderHud />
+          <BuilderPauseMenu onExit={handleExitBuilder} />
+        </>
+      )}
+
+      {/* Asset Library in "place" mode — pick a saved asset to drop on the plot. */}
+      {placeLibraryOpen && stage === 'plot' && (
+        <AssetLibraryPanel
+          title="Place an asset"
+          hint="Pick a saved asset, then click a spot on your plot"
+          onPick={armPlacement}
+          onClose={() => setPlaceLibraryOpen(false)}
+        />
+      )}
+
+      {/* Placement-armed hint banner. */}
+      {placing && stage === 'plot' && (
+        <div className="pointer-events-none fixed top-24 left-1/2 z-40 -translate-x-1/2 select-none">
+          <div className="hud-panel pointer-events-auto flex items-center gap-4 px-6 py-3">
+            <span className="font-mono text-xs tracking-[0.2em] text-cyan uppercase">
+              Click a spot on your plot to place it
+            </span>
+            <button
+              onClick={cancelPlacement}
+              className="font-mono text-[11px] tracking-[0.25em] text-magenta/80 uppercase transition-colors hover:text-magenta"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete-account confirmation (triggered from the in-world Account terminal). */}
       <ConfirmDialog
@@ -415,9 +543,15 @@ export default function LandingPage() {
       {/* The storefront dashboard (district chooser) is rendered in-world on the
           façade — see StorefrontDashboard inside CityField. */}
 
-      {/* Plot view: arrived at the user's plot (in-world marker + this HUD). */}
-      {stage === 'plot' && (
-        <PlotHud onBackToCity={handleBackToCity} onBackToLanding={handleBack} />
+      {/* Plot view: arrived at the user's plot (in-world marker + this HUD).
+          Hidden during the fly-in to the builder (stage is still 'plot' then). */}
+      {stage === 'plot' && !enteringBuilder && (
+        <PlotHud
+          onBackToCity={handleBackToCity}
+          onBackToLanding={handleBack}
+          onEnterBuilder={handleEnterBuilder}
+          onPlaceAsset={() => setPlaceLibraryOpen(true)}
+        />
       )}
 
       {/* Skip control for impatient users (immersive-pattern best practice). */}

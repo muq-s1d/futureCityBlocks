@@ -10,7 +10,11 @@ import { Rain } from '@/components/city/Rain.r3f'
 import { Storefront } from '@/components/city/Storefront.r3f'
 import { StorefrontAtmosphere } from '@/components/city/StorefrontAtmosphere.r3f'
 import { StorefrontDashboard } from '@/components/city/StorefrontDashboard.r3f'
+import { BuilderScene } from '@/components/builder/BuilderScene.r3f'
+import { AssetMesh } from '@/components/r3f/AssetMesh.r3f'
+import { PlotGroundPicker } from '@/components/city/PlotGroundPicker.r3f'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
+import type { PlacedAsset } from '@/lib/assets'
 import { loadCityPlots } from '@/lib/city'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -102,24 +106,32 @@ export function CityField({
   toCity,
   toStore,
   toPlot,
+  toBuilder,
   stage,
   authActive,
+  placedObjects,
+  placing,
   onAuthSuccess,
   onEnterPlot,
   onSignOut,
   onRequestDelete,
+  onGroundPick,
 }: {
   progress: RefObject<number>
   approach: RefObject<number>
   toCity: RefObject<number>
   toStore: RefObject<number>
   toPlot: RefObject<number>
+  toBuilder: RefObject<number>
   stage: WorldStage
   authActive: boolean
+  placedObjects: PlacedAsset[]
+  placing: boolean
   onAuthSuccess: () => void
   onEnterPlot: (districtId: string) => void
   onSignOut: () => void
   onRequestDelete: () => void
+  onGroundPick: (x: number, z: number) => void
 }) {
   const bodyRef = useRef<THREE.InstancedMesh>(null!)
   const crownRef = useRef<THREE.InstancedMesh>(null!)
@@ -231,6 +243,11 @@ export function CityField({
   const stageTgt = useMemo(() => new THREE.Vector3(), [])
   const arrivePos = useMemo(() => new THREE.Vector3(), [])
   const arriveTgt = useMemo(() => new THREE.Vector3(), [])
+  // Builder entry/exit waypoint — in front of and above the lot, looking at it.
+  // Matches BuilderScene's home pose so the hand-off to the FPS controller (and
+  // the return on exit) is seamless. Recomputed per frame from the owned plot.
+  const builderPos = useMemo(() => new THREE.Vector3(), [])
+  const builderTgt = useMemo(() => new THREE.Vector3(), [])
 
   useFrame((_, dt) => {
     const target = progress.current ?? 0
@@ -289,8 +306,26 @@ export function CityField({
       }
     }
 
-    camera.position.copy(tmpPos)
-    camera.lookAt(tmpTgt)
+    const tb = toBuilder.current ?? 0
+    if (tb > 0.0001 && ownedPlot) {
+      const wx = plotWorldX(ownedPlot.grid_x) + CITY_OFFSET.x
+      const wz = plotWorldZ(ownedPlot.grid_z) + CITY_OFFSET.z
+      builderPos.set(wx, 6, wz + 11)
+      builderTgt.set(wx, 3, wz)
+      const be = tb * tb * (3 - 2 * tb)
+      tmpPos.lerp(builderPos, be)
+      tmpTgt.lerp(builderTgt, be)
+    }
+
+    // While stage === 'builder', BuilderScene's FPS controller owns the camera —
+    // CityField must NOT also write it, or the two fight and the view jitters.
+    // The toBuilder leg above still runs during the 'plot'→builder fly-in and the
+    // builder→'plot' return (both happen while stage is 'plot'), handing off to /
+    // from BuilderScene's matching home pose.
+    if (stage !== 'builder') {
+      camera.position.copy(tmpPos)
+      camera.lookAt(tmpTgt)
+    }
 
     // Day/night: ease the blend and push it into bg/fog/lights (no re-render).
     dn.current += (dnTarget.current - dn.current) * (1 - Math.exp(-2.2 * dt))
@@ -348,7 +383,17 @@ export function CityField({
               ownedPlotId={ownedPlot?.id ?? null}
               reserve={STOREFRONT_RESERVE}
             />
+            {/* Placed assets show on the plot AND as context while building. */}
+            {(stage === 'plot' || stage === 'builder') &&
+              placedObjects.map((obj) => <AssetMesh key={obj.id} object={obj} />)}
+            {/* Ground picker for placing a saved asset (PlotHud "place" mode). */}
+            {placing && stage === 'plot' && ownedPlot && (
+              <PlotGroundPicker plot={ownedPlot} onPick={onGroundPick} />
+            )}
           </group>
+
+          {/* First-person voxel builder owns the camera while stage === 'builder'. */}
+          {stage === 'builder' && <BuilderScene />}
           <Storefront position={STOREFRONT_POS}>
             <StorefrontAtmosphere />
             {stage === 'dashboard' && (

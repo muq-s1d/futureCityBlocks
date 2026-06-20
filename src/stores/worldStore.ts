@@ -3,9 +3,10 @@ import { create } from 'zustand'
 /**
  * The single persistent-canvas flow stage. The camera and DOM overlays key off
  * this as the user moves through one continuous world:
- *   landing (scroll) → auth (kiosk) → dashboard (storefront) → plot (their lot).
+ *   landing (scroll) → auth (kiosk) → dashboard (storefront) → plot (their lot)
+ *   → builder (the first-person voxel editor on that lot).
  */
-export type WorldStage = 'landing' | 'auth' | 'dashboard' | 'plot'
+export type WorldStage = 'landing' | 'auth' | 'dashboard' | 'plot' | 'builder'
 
 interface WorldStore {
   stage: WorldStage

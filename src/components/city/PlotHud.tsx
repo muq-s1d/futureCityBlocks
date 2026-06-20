@@ -4,8 +4,8 @@ import { useAuthStore } from '@/stores/authStore'
 /**
  * DOM overlay for the in-world plot view (Build Order #14). Shown once the camera
  * has flown to the user's plot (stage === 'plot'). Reports the plot's identity +
- * claimed/empty state and offers a way back to the city (storefront) or landing.
- * The voxel builder that fills the plot arrives in Phase 2.
+ * claimed/empty state, opens the voxel builder, places saved assets, and offers a
+ * way back to the city (storefront) or landing.
  */
 
 // District accent → palette token class (no off-palette hex in components).
@@ -18,9 +18,13 @@ const ACCENT: Record<string, string> = {
 export function PlotHud({
   onBackToCity,
   onBackToLanding,
+  onEnterBuilder,
+  onPlaceAsset,
 }: {
   onBackToCity: () => void
   onBackToLanding: () => void
+  onEnterBuilder: () => void
+  onPlaceAsset: () => void
 }) {
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
   const district = DISTRICTS.find((d) => d.id === ownedPlot?.district)
@@ -37,9 +41,26 @@ export function PlotHud({
         </div>
         <div className="text-readable mx-auto mt-3 max-w-xs font-mono text-xs leading-relaxed tracking-[0.15em] text-muted uppercase">
           {ownedPlot
-            ? 'This plot is empty. The voxel builder lands here in Phase 2 — claim it and start building soon.'
+            ? 'Your lot. Build a structure in the voxel editor, or drop a saved asset onto the ground.'
             : 'Pick a district at the storefront to stake your claim.'}
         </div>
+
+        {ownedPlot && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              onClick={onEnterBuilder}
+              className="cursor-target border border-cyan px-7 py-3 font-display text-xs font-bold tracking-[0.25em] text-cyan uppercase transition-colors hover:bg-cyan/10 hover:shadow-glow-cyan"
+            >
+              ⛏ Build
+            </button>
+            <button
+              onClick={onPlaceAsset}
+              className="cursor-target border border-amber px-7 py-3 font-display text-xs font-bold tracking-[0.25em] text-amber uppercase transition-colors hover:bg-amber/10"
+            >
+              ⊞ Place an asset
+            </button>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center justify-center gap-6">
           <button
