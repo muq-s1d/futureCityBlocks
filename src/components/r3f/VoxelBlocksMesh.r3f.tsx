@@ -26,10 +26,22 @@ export interface VoxelBlocksHandle {
   pickCell: (mesh: THREE.Object3D, instanceId: number) => VoxelBlock | null
 }
 
-// Hard cap on instances per type = the whole build volume. The builder clamps
-// placement to BUILDER_BOUNDS, and assets are authored in the builder, so no
-// structure can exceed this — capacity stays fixed (no mesh re-creation churn).
-const MAX_INSTANCES = BUILDER_BOUNDS.w * BUILDER_BOUNDS.d * BUILDER_BOUNDS.h
+// Absolute ceiling on instances per type = the whole build volume. A real build
+// never fills it, so we don't preallocate this much — instead each mesh's
+// capacity grows in powers of two (from BASE_CAPACITY) as blocks are added, and
+// only re-creates at a power-of-two boundary, capped here.
+const HARD_CAP = BUILDER_BOUNDS.w * BUILDER_BOUNDS.d * BUILDER_BOUNDS.h
+const BASE_CAPACITY = 256
+
+/** Smallest power-of-two capacity (≥ BASE_CAPACITY, ≤ HARD_CAP) that fits the
+ *  largest single-type bucket. */
+function capacityFor(byType: VoxelBlock[][]): number {
+  let max = 0
+  for (const bucket of byType) if (bucket.length > max) max = bucket.length
+  let cap = BASE_CAPACITY
+  while (cap < max) cap *= 2
+  return Math.min(cap, HARD_CAP)
+}
 
 export const VoxelBlocksMesh = forwardRef<VoxelBlocksHandle, { blocks: VoxelBlock[] }>(
   function VoxelBlocksMesh({ blocks }, ref) {
@@ -47,6 +59,10 @@ export const VoxelBlocksMesh = forwardRef<VoxelBlocksHandle, { blocks: VoxelBloc
       }
       return buckets
     }, [blocks])
+
+    // Shared instance capacity for all 7 meshes — grows in power-of-two steps,
+    // so it only changes (and re-creates the meshes) on a boundary, not per add.
+    const capacity = useMemo(() => capacityFor(byType), [byType])
 
     useLayoutEffect(() => {
       const m = new THREE.Matrix4()
@@ -89,11 +105,13 @@ export const VoxelBlocksMesh = forwardRef<VoxelBlocksHandle, { blocks: VoxelBloc
           const emissive = EMISSIVE_BLOCKS.has(type)
           return (
             <instancedMesh
-              key={type}
+              // Re-key on capacity so a grow cleanly remounts the mesh at the new
+              // size and re-runs the ref (which refreshes meshRefs for raycasting).
+              key={`${type}:${capacity}`}
               ref={(el) => {
                 if (el) meshRefs.current[ti] = el
               }}
-              args={[undefined, undefined, MAX_INSTANCES]}
+              args={[undefined, undefined, capacity]}
               frustumCulled={false}
             >
               <boxGeometry args={[CELL, CELL, CELL]} />

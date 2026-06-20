@@ -14,6 +14,7 @@ import { BuilderScene } from '@/components/builder/BuilderScene.r3f'
 import { AssetMesh } from '@/components/r3f/AssetMesh.r3f'
 import { PlotGroundPicker } from '@/components/city/PlotGroundPicker.r3f'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
+import { builderArrivalPose } from '@/constants/builder'
 import type { PlacedAsset } from '@/lib/assets'
 import { loadCityPlots } from '@/lib/city'
 import { useCityStore } from '@/stores/cityStore'
@@ -310,8 +311,9 @@ export function CityField({
     if (tb > 0.0001 && ownedPlot) {
       const wx = plotWorldX(ownedPlot.grid_x) + CITY_OFFSET.x
       const wz = plotWorldZ(ownedPlot.grid_z) + CITY_OFFSET.z
-      builderPos.set(wx, 6, wz + 11)
-      builderTgt.set(wx, 3, wz)
+      const arrival = builderArrivalPose(wx, wz)
+      builderPos.set(...arrival.pos)
+      builderTgt.set(...arrival.tgt)
       const be = tb * tb * (3 - 2 * tb)
       tmpPos.lerp(builderPos, be)
       tmpTgt.lerp(builderTgt, be)

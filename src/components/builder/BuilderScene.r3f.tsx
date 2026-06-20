@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { VoxelBlocksMesh, type VoxelBlocksHandle } from '@/components/r3f/VoxelBlocksMesh.r3f'
 import { BlockHighlight } from '@/components/builder/BlockHighlight.r3f'
 import {
+  builderArrivalPose,
   BUILDER_BOUNDS,
   CELL,
   FLY_SPEED,
@@ -31,7 +32,7 @@ import { useBuilderStore } from '@/stores/builderStore'
 const W = BUILDER_BOUNDS.w
 const D = BUILDER_BOUNDS.d
 const H = BUILDER_BOUNDS.h
-const PAD = 2 // how far outside the volume the camera may fly (to see outer faces)
+const PAD = 4 // how far outside the volume the camera may fly (to see outer faces)
 
 type HitKind = 'none' | 'block' | 'ground'
 
@@ -68,8 +69,9 @@ export function BuilderScene() {
 
   // Home pose: in front of (+z) and above the plot, looking down at its centre.
   const home = useMemo(() => {
-    const p = new THREE.Vector3(cx, 6, cz + 11)
-    const target = new THREE.Vector3(cx, 3, cz)
+    const arrival = builderArrivalPose(cx, cz)
+    const p = new THREE.Vector3(...arrival.pos)
+    const target = new THREE.Vector3(...arrival.tgt)
     const dir = target.clone().sub(p).normalize()
     const pit = Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1))
     const cosP = Math.cos(pit) || 1e-4
@@ -148,6 +150,11 @@ export function BuilderScene() {
     r.far = MAX_REACH * CELL // reach cap; set once (mutating it per-frame trips the immutability lint)
     return r
   }, [])
+  // Bounds-cage wireframe geometry — built once, not per render (blocks change often).
+  const cageGeo = useMemo(
+    () => new THREE.EdgesGeometry(new THREE.BoxGeometry(W * CELL, H * CELL, D * CELL)),
+    [],
+  )
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), [])
   const euler = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
   const moveVec = useMemo(() => new THREE.Vector3(), [])
@@ -277,13 +284,19 @@ export function BuilderScene() {
       </mesh>
 
       {/* Bounds cage — faint wireframe so the buildable volume is legible. */}
-      <lineSegments position={[(W * CELL) / 2, (H * CELL) / 2, (D * CELL) / 2]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(W * CELL, H * CELL, D * CELL)]} />
+      <lineSegments
+        geometry={cageGeo}
+        position={[(W * CELL) / 2, (H * CELL) / 2, (D * CELL) / 2]}
+      >
         <lineBasicMaterial color={PALETTE.border} transparent opacity={0.4} toneMapped={false} />
       </lineSegments>
 
-      {/* A little fill light so blocks read even at night. */}
-      <pointLight position={[(W * CELL) / 2, H * CELL, (D * CELL) / 2]} intensity={0.6} distance={40} />
+      {/* Fill light so blocks read even at night — reaches the full tall volume. */}
+      <pointLight
+        position={[(W * CELL) / 2, H * CELL * 0.7, (D * CELL) / 2]}
+        intensity={0.85}
+        distance={H * CELL * 3}
+      />
     </group>
   )
 }

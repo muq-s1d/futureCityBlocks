@@ -14,18 +14,40 @@
 import { PALETTE } from '@/constants/palette'
 import type { BlockType } from '@/types/voxel'
 
-/** World units per voxel cell. LOT (8, CITY_CONFIG) is the plot footprint, so a
- *  1-unit cell yields an exact 8×8 floor with no fudge factor. */
+/** World units per voxel cell. */
 export const CELL = 1
 
-/** Build volume in cells. w×d matches the LOT footprint; h gives generous height. */
-export const BUILDER_BOUNDS = { w: 8, d: 8, h: 16 } as const
+/**
+ * Build volume in cells — a generous 40×40 footprint and 100 cells tall, so
+ * players can raise full skyscrapers, not just lot-sized structures. This is the
+ * builder's editing space; it's larger than a city LOT (8u), so big builds will
+ * overhang neighbouring lots when placed back on the plot (intended — skyscrapers
+ * are meant to be big). The hard cap on rendered instances (VoxelBlocksMesh) is
+ * decoupled from this volume so an empty builder doesn't preallocate 160k cubes.
+ */
+export const BUILDER_BOUNDS = { w: 40, d: 40, h: 100 } as const
 
 /** Raycast hit-distance cap (cells) — how far the player can reach to edit. */
-export const MAX_REACH = 10
+export const MAX_REACH = 12
 
-/** Fly speed (world units / second) for WASD + vertical movement. */
-export const FLY_SPEED = 6
+/** Fly speed (world units / second) for WASD + vertical movement. Scaled up for
+ *  the larger volume so crossing the 100-tall space doesn't crawl. */
+export const FLY_SPEED = 16
+
+/**
+ * Camera arrival/home pose for a plot at world (cx, cz): pulled back and up to
+ * frame the big build box. Shared by CityField's fly-in leg and BuilderScene's
+ * FPS home so the hand-off (and the return on exit) is seamless.
+ */
+export function builderArrivalPose(
+  cx: number,
+  cz: number,
+): { pos: [number, number, number]; tgt: [number, number, number] } {
+  return {
+    pos: [cx, BUILDER_BOUNDS.h * 0.25, cz + BUILDER_BOUNDS.w * 1.1],
+    tgt: [cx, BUILDER_BOUNDS.h * 0.2, cz],
+  }
+}
 
 /** Mouse-look sensitivity (radians per pixel of pointer movement). */
 export const MOUSE_SENSITIVITY = 0.0022
