@@ -20,6 +20,7 @@ import { loadCityPlots } from '@/lib/city'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useQualityStore } from '@/stores/qualityStore'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 import type { WorldStage } from '@/stores/worldStore'
 
 /**
@@ -144,6 +145,7 @@ export function CityField({
   const weather = useCityStore((s) => s.weather)
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
   const downgrade = useQualityStore((s) => s.downgrade)
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
 
   // Day/night blend (0 = night, 1 = day): eased toward its target each frame and
   // applied to bg/fog/lights through refs, so toggling never re-renders the scene.
@@ -158,10 +160,13 @@ export function CityField({
     dnTarget.current = timeOfDay === 'day' ? 1 : 0
   }, [timeOfDay])
 
-  // Pull the plot grid once the user has left the landing.
+  const loadWorldConfig = useWorldConfigStore((s) => s.loadWorldConfig)
+
   useEffect(() => {
-    if (stage !== 'landing' && plots.length === 0) void loadCityPlots()
-  }, [stage, plots.length])
+    if (stage !== 'landing' && plots.length === 0) {
+      void loadWorldConfig().then(() => loadCityPlots())
+    }
+  }, [stage, plots.length, loadWorldConfig])
 
   const buildings = useMemo<Building[]>(() => {
     const arr: Building[] = []
@@ -281,8 +286,8 @@ export function CityField({
 
     const pl = toPlot.current ?? 0
     if (pl > 0.0001 && ownedPlot) {
-      const wx = plotWorldX(ownedPlot.grid_x) + CITY_OFFSET.x
-      const wz = plotWorldZ(ownedPlot.grid_z) + CITY_OFFSET.z
+      const wx = plotWorldX(ownedPlot.grid_x, cityConfig) + CITY_OFFSET.x
+      const wz = plotWorldZ(ownedPlot.grid_z, cityConfig) + CITY_OFFSET.z
       const side = wx < 0 ? -1 : 1
       // The plots sit in the cleared band (z −150…−300). A straight line from the
       // storefront to a near-row plot used to cross z=−150 into the skyline and
@@ -309,8 +314,8 @@ export function CityField({
 
     const tb = toBuilder.current ?? 0
     if (tb > 0.0001 && ownedPlot) {
-      const wx = plotWorldX(ownedPlot.grid_x) + CITY_OFFSET.x
-      const wz = plotWorldZ(ownedPlot.grid_z) + CITY_OFFSET.z
+      const wx = plotWorldX(ownedPlot.grid_x, cityConfig) + CITY_OFFSET.x
+      const wz = plotWorldZ(ownedPlot.grid_z, cityConfig) + CITY_OFFSET.z
       const arrival = builderArrivalPose(wx, wz)
       builderPos.set(...arrival.pos)
       builderTgt.set(...arrival.tgt)

@@ -1,5 +1,6 @@
-import { DISTRICTS } from '@/constants/city'
+import { districtForColumn } from '@/lib/cityGrid'
 import { useAuthStore } from '@/stores/authStore'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 
 /**
  * DOM overlay for the in-world plot view (Build Order #14). Shown once the camera
@@ -8,7 +9,6 @@ import { useAuthStore } from '@/stores/authStore'
  * way back to the city (storefront) or landing.
  */
 
-// District accent → palette token class (no off-palette hex in components).
 const ACCENT: Record<string, string> = {
   neon: 'text-cyan',
   corporate: 'text-amber',
@@ -27,8 +27,9 @@ export function PlotHud({
   onPlaceAsset: () => void
 }) {
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
-  const district = DISTRICTS.find((d) => d.id === ownedPlot?.district)
-  const accent = ACCENT[ownedPlot?.district ?? ''] ?? 'text-cyan'
+  const districts = useWorldConfigStore((s) => s.districts)
+  const district = ownedPlot ? districtForColumn(ownedPlot.grid_x, districts) : null
+  const accent = ACCENT[district?.id ?? ''] ?? 'text-cyan'
 
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex flex-col items-center justify-end pb-14 select-none">

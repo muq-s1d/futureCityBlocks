@@ -2,11 +2,11 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import * as THREE from 'three'
-import { CITY_CONFIG, DISTRICTS, districtForColumn } from '@/constants/city'
 import { PALETTE } from '@/constants/palette'
-import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
+import { plotWorldX, plotWorldZ, districtForColumn } from '@/lib/cityGrid'
 import { useQualityCaps } from '@/stores/qualityStore'
 import { useStorefrontStore } from '@/stores/storefrontStore'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 import type { Plot } from '@/types/db'
 
 /**
@@ -26,28 +26,12 @@ import type { Plot } from '@/types/db'
 const MONO = '/fonts/ShareTechMono-Regular.ttf'
 const DISPLAY = '/fonts/Orbitron.ttf'
 
-const TILT = 1.3 // stand the map up to face the camera (top-down read)
-const HALF_X = 7.0 // on-screen half-width
-const SWAY = 0.42 // gentle slow yaw sway, in radians (a full spin would look like a propeller)
-
-// True half-extents of the CLAIMABLE GRID itself — NOT CITY_HALF_DEPTH, which folds in
-// the ~172u approach distance from the world origin and would squash the map ~3× in depth.
-const CZ = (plotWorldZ(0) + plotWorldZ(CITY_CONFIG.GRID_ROWS - 1)) / 2 // recentre depth on 0
-const X_HALF = Math.abs(plotWorldX(0))
-const Z_HALF = Math.abs(plotWorldZ(0) - CZ)
-const SC = HALF_X / X_HALF // uniform world→mini scale (keeps lots square)
-const HALF_Z = Z_HALF * SC // derived → the real wide-and-shallow footprint
-const PAD = CITY_CONFIG.LOT * SC * 0.48 // small pad so each lot reads as a distinct square
-// NOTE: the swayed map's lowest/highest on-screen point comes from a swept corner, not
-// HALF_Z. Header/chips sit clear of (HALF_X·sin(SWAY)+HALF_Z·cos(SWAY))·sin(TILT).
+const TILT = 1.3
+const HALF_X = 7.0
+const SWAY = 0.42
 
 const tmp = new THREE.Object3D()
 const tmpC = new THREE.Color()
-
-const mini = (gx: number, gz: number): [number, number] => [
-  plotWorldX(gx) * SC,
-  (plotWorldZ(gz) - CZ) * SC,
-]
 
 export function HoloCityMap({
   plots,
@@ -58,27 +42,42 @@ export function HoloCityMap({
   ownedPlot: Plot | null
   onPick: (districtId: string) => void
 }) {
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
+  const districts = useWorldConfigStore((s) => s.districts)
   const caps = useQualityCaps()
   const animated = caps.animatedHolograms
   const [hover, setHover] = useState<string | null>(null)
   const setFocus = useStorefrontStore((s) => s.setFocus)
 
-  const ownedDistrict = ownedPlot ? districtForColumn(ownedPlot.grid_x).id : null
+  const ownedDistrict = ownedPlot ? districtForColumn(ownedPlot.grid_x, districts).id : null
+
+  const { SC, HALF_Z, PAD, mini } = useMemo(() => {
+    const cz = (plotWorldZ(0, cityConfig) + plotWorldZ(cityConfig.GRID_ROWS - 1, cityConfig)) / 2
+    const xHalf = Math.abs(plotWorldX(0, cityConfig))
+    const zHalf = Math.abs(plotWorldZ(0, cityConfig) - cz)
+    const sc = HALF_X / xHalf
+    const halfZ = zHalf * sc
+    const pad = cityConfig.LOT * sc * 0.48
+    const miniFn = (gx: number, gz: number): [number, number] => [
+      plotWorldX(gx, cityConfig) * sc,
+      (plotWorldZ(gz, cityConfig) - cz) * sc,
+    ]
+    return { CZ: cz, SC: sc, HALF_Z: halfZ, PAD: pad, mini: miniFn }
+  }, [cityConfig])
 
   const stats = useMemo(() => {
     const m: Record<string, { total: number; owned: number; open: number }> = {}
-    for (const d of DISTRICTS) m[d.id] = { total: 0, owned: 0, open: 0 }
+    for (const d of districts) m[d.id] = { total: 0, owned: 0, open: 0 }
     for (const p of plots) {
-      const s = m[districtForColumn(p.grid_x).id]
+      const s = m[districtForColumn(p.grid_x, districts).id]
       if (!s) continue
       s.total++
       if (p.owner_id) s.owned++
       else s.open++
     }
     return m
-  }, [plots])
+  }, [plots, districts])
 
-  // ── Instanced pads (all 200 lots, flat) ────────────────────────────────────
   const padRef = useRef<THREE.InstancedMesh>(null!)
   useLayoutEffect(() => {
     const mesh = padRef.current
@@ -90,7 +89,7 @@ export function HoloCityMap({
       tmp.scale.set(PAD, 0.04, PAD)
       tmp.updateMatrix()
       mesh.setMatrixAt(i, tmp.matrix)
-      const d = districtForColumn(p.grid_x)
+      const d = districtForColumn(p.grid_x, districts)
       const lit = hover === d.id || ownedDistrict === d.id
       const own = ownedPlot?.id === p.id
       const k = own ? 1.6 : p.owner_id ? 1 : lit ? 0.85 : 0.42
@@ -100,21 +99,19 @@ export function HoloCityMap({
     mesh.count = plots.length
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [plots, hover, ownedDistrict, ownedPlot])
+  }, [plots, hover, ownedDistrict, ownedPlot, mini, PAD, districts])
 
   const spin = useRef<THREE.Group>(null)
   const radar = useRef<THREE.Mesh>(null)
   const scan = useRef<THREE.Mesh>(null)
   useFrame((state) => {
     const t = state.clock.elapsedTime
-    // Slow yaw sway (always — cheap, never stops when the quality tier drops).
     if (spin.current) spin.current.rotation.y = Math.sin(t * 0.28) * SWAY
     if (animated && radar.current) {
-      const s = (t % 4) / 4 // 0→1 radar wipe
+      const s = (t % 4) / 4
       radar.current.scale.set(s * HALF_X * 1.3, s * HALF_X * 1.3, 1)
       ;(radar.current.material as THREE.MeshBasicMaterial).opacity = (1 - s) * 0.22
     }
-    // Hologram scanline sweeping up the map face (in the map plane's depth axis).
     if (animated && scan.current) {
       const s = (t * 0.5) % 1
       scan.current.position.z = -HALF_Z + s * HALF_Z * 2
@@ -129,7 +126,6 @@ export function HoloCityMap({
 
   return (
     <group>
-      {/* Header readout */}
       <Text
         font={MONO}
         fontSize={0.62}
@@ -142,20 +138,17 @@ export function HoloCityMap({
         {ownedPlot ? '◢ YOUR LOT IS LIVE ON THE GRID' : '◢ SELECT A DISTRICT TO CLAIM'}
       </Text>
 
-      {/* Big top-down holographic map, stood up to face the camera. */}
       <group position={[0, 0.5, 0]} rotation-x={TILT}>
         <group ref={spin}>
-          {/* Dark base + central highway strip (in the map plane) */}
           <mesh position={[0, -0.03, 0]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[HALF_X * 2.1, HALF_Z * 2.5]} />
             <meshBasicMaterial color="#02060a" transparent opacity={0.72} toneMapped={false} />
           </mesh>
           <mesh position={[0, -0.02, 0]} rotation-x={-Math.PI / 2}>
-            <planeGeometry args={[CITY_CONFIG.CORRIDOR_HALF * 2 * SC, HALF_Z * 2.4]} />
+            <planeGeometry args={[cityConfig.CORRIDOR_HALF * 2 * SC, HALF_Z * 2.4]} />
             <meshBasicMaterial color={PALETTE.cyan} transparent opacity={0.06} toneMapped={false} />
           </mesh>
 
-          {/* Radar wipe (skipped on low tier) */}
           {animated && (
             <mesh ref={radar} position={[0, 0.01, 0]} rotation-x={-Math.PI / 2}>
               <ringGeometry args={[0.93, 1, 56]} />
@@ -163,9 +156,6 @@ export function HoloCityMap({
             </mesh>
           )}
 
-          {/* Holographic scanlines: faint static lines + one bright sweeping bar,
-              both lying in the map plane. Animated tiers only (cheap, but it's the
-              "live projection" tell). */}
           {animated && (
             <group>
               {Array.from({ length: 14 }).map((_, i) => (
@@ -185,22 +175,20 @@ export function HoloCityMap({
             </group>
           )}
 
-          {/* 200 lot pads */}
           <instancedMesh
             ref={padRef}
-            args={[undefined, undefined, CITY_CONFIG.TOTAL_PLOTS]}
+            args={[undefined, undefined, cityConfig.TOTAL_PLOTS]}
             frustumCulled={false}
           >
             <boxGeometry args={[1, 1, 1]} />
             <meshBasicMaterial toneMapped={false} />
           </instancedMesh>
 
-          {ownedMini && <OwnedRing x={ownedMini[0]} z={ownedMini[1]} />}
+          {ownedMini && <OwnedRing x={ownedMini[0]} z={ownedMini[1]} pad={PAD} />}
         </group>
       </group>
 
-      {/* Clickable legend chips */}
-      {DISTRICTS.map((d, i) => {
+      {districts.map((d, i) => {
         const s = stats[d.id] ?? { total: 0, owned: 0, open: 0 }
         const enter = ownedDistrict === d.id
         const can = available(d.id)
@@ -236,8 +224,7 @@ export function HoloCityMap({
   )
 }
 
-/** A flat pulsing ring marking the user's own plot (stays in the map plane). */
-function OwnedRing({ x, z }: { x: number; z: number }) {
+function OwnedRing({ x, z, pad }: { x: number; z: number; pad: number }) {
   const ring = useRef<THREE.Mesh>(null)
   useFrame((state) => {
     const t = state.clock.elapsedTime
@@ -248,13 +235,12 @@ function OwnedRing({ x, z }: { x: number; z: number }) {
   })
   return (
     <mesh ref={ring} position={[x, 0.05, z]} rotation-x={-Math.PI / 2}>
-      <ringGeometry args={[PAD * 0.9, PAD * 1.25, 24]} />
+      <ringGeometry args={[pad * 0.9, pad * 1.25, 24]} />
       <meshBasicMaterial color="#ffffff" transparent opacity={0.8} toneMapped={false} side={THREE.DoubleSide} />
     </mesh>
   )
 }
 
-/** A flat legend chip below the holo — the dependable click target. */
 function Chip({
   x,
   label,

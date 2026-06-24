@@ -1,21 +1,11 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
-import { CITY_HALF_WIDTH, CITY_HALF_DEPTH } from '@/lib/cityGrid'
-
-/**
- * Instanced cyberpunk rain: thin vertical streaks falling over the grid in a
- * single draw call. Each streak wraps back to the top once it hits the ground,
- * so a fixed pool animates forever. Mounted only when weather === 'rain'.
- *
- * The mutable streak pool lives in a ref (built in an effect, where impure RNG is
- * allowed) and is mutated each frame — never a hook-memoised value.
- */
+import { cityHalfWidth, cityHalfDepth } from '@/lib/cityGrid'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 
 const COUNT = 1400
-const SPAN_X = CITY_HALF_WIDTH * 2 + 60
-const SPAN_Z = CITY_HALF_DEPTH * 2 + 60
 const TOP = 130
 const dummy = new THREE.Object3D()
 
@@ -27,6 +17,9 @@ interface Pool {
 }
 
 export function Rain() {
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
+  const SPAN_X = useMemo(() => cityHalfWidth(cityConfig) * 2 + 60, [cityConfig])
+  const SPAN_Z = useMemo(() => cityHalfDepth(cityConfig) * 2 + 60, [cityConfig])
   const ref = useRef<THREE.InstancedMesh>(null!)
   const pool = useRef<Pool | null>(null)
 

@@ -1,22 +1,24 @@
 /**
- * City data actions. Like lib/auth.ts, Supabase access lives here (not in
- * components) and writes results into the state-only cityStore.
+ * City data actions. Supabase access lives here (not in components) and writes
+ * results into the state-only cityStore / worldConfigStore.
  */
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 import { fallbackPlots } from '@/lib/cityGrid'
 import type { Plot } from '@/types/db'
 
 /** Load all plots into the store; falls back to a local grid if the DB is out. */
 export async function loadCityPlots(): Promise<void> {
+  const { cityConfig, districts } = useWorldConfigStore.getState()
   if (!isSupabaseConfigured) {
-    useCityStore.getState().setPlots(fallbackPlots())
+    useCityStore.getState().setPlots(fallbackPlots(cityConfig, districts))
     return
   }
   const { data, error } = await supabase.from('plots').select('*').order('id')
   if (error || !data || data.length === 0) {
-    useCityStore.getState().setPlots(fallbackPlots())
+    useCityStore.getState().setPlots(fallbackPlots(cityConfig, districts))
   } else {
     useCityStore.getState().setPlots(data as Plot[])
   }

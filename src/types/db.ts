@@ -13,11 +13,40 @@ export interface Profile {
 export interface Plot {
   id: number
   owner_id: string | null
-  district: string
   grid_x: number
   grid_z: number
   name: string
   claimed_at: string | null
+}
+
+export interface CityConfigValues {
+  GRID_COLS: number
+  GRID_ROWS: number
+  TOTAL_PLOTS: number
+  PLOT_SIZE: number
+  LOT: number
+  ALLEY: number
+  STREET: number
+  CORRIDOR_HALF: number
+  NEAR: number
+  BLOCK_COLS: number
+  BLOCK_ROWS: number
+}
+
+export interface DistrictConfig {
+  id: string
+  label: string
+  color: string
+  gridRange: { xMin: number; xMax: number }
+}
+
+export interface WorldConfig {
+  id: number
+  version: number
+  is_active: boolean
+  config: CityConfigValues
+  districts: DistrictConfig[]
+  created_at: string
 }
 
 export interface Asset {

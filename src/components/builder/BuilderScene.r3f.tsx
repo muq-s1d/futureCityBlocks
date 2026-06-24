@@ -6,7 +6,7 @@ import { BlockHighlight } from '@/components/builder/BlockHighlight.r3f'
 import {
   BLOCK_COLOR,
   builderArrivalPose,
-  BUILDER_BOUNDS,
+  builderBoundsForConfig,
   CELL,
   FLY_SPEED,
   MAX_REACH,
@@ -16,6 +16,7 @@ import { PALETTE } from '@/constants/palette'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
 import { useAuthStore } from '@/stores/authStore'
 import { useBuilderStore } from '@/stores/builderStore'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 
 /**
  * First-person flying voxel editor (Minecraft-style). Owns the camera entirely
@@ -30,10 +31,7 @@ import { useBuilderStore } from '@/stores/builderStore'
  * exit) is detected via `pointerlockchange`, not a keydown handler.
  */
 
-const W = BUILDER_BOUNDS.w
-const D = BUILDER_BOUNDS.d
-const H = BUILDER_BOUNDS.h
-const PAD = 4 // how far outside the volume the camera may fly (to see outer faces)
+const PAD = 4
 
 type HitKind = 'none' | 'block' | 'ground'
 
@@ -44,17 +42,22 @@ export function BuilderScene() {
   const registerLock = useBuilderStore((s) => s.registerLock)
   const registerCapture = useBuilderStore((s) => s.registerCapture)
   const setLocked = useBuilderStore((s) => s.setLocked)
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
+
+  const bounds = useMemo(() => builderBoundsForConfig(cityConfig), [cityConfig])
+  const W = bounds.w
+  const D = bounds.d
+  const H = bounds.h
 
   const voxelRef = useRef<VoxelBlocksHandle>(null)
   const highlightRef = useRef<THREE.Mesh>(null)
   const baseRef = useRef<THREE.Mesh>(null)
 
-  // Plot world centre + the build volume's min corner (group origin).
   const { cx, cz, originX, originZ } = useMemo(() => {
-    const wx = ownedPlot ? plotWorldX(ownedPlot.grid_x) : 0
-    const wz = ownedPlot ? plotWorldZ(ownedPlot.grid_z) : 0
+    const wx = ownedPlot ? plotWorldX(ownedPlot.grid_x, cityConfig) : 0
+    const wz = ownedPlot ? plotWorldZ(ownedPlot.grid_z, cityConfig) : 0
     return { cx: wx, cz: wz, originX: wx - (W * CELL) / 2, originZ: wz - (D * CELL) / 2 }
-  }, [ownedPlot])
+  }, [ownedPlot, cityConfig, W])
 
   // FPS camera state (refs, never re-rendered): world position + look angles.
   const pos = useRef(new THREE.Vector3())

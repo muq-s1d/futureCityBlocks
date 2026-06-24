@@ -12,7 +12,8 @@
  * in-family hues, not arbitrary off-palette colours.
  */
 import { PALETTE } from '@/constants/palette'
-import { CITY_CONFIG } from '@/constants/city'
+import { DEFAULT_CITY_CONFIG } from '@/constants/city'
+import type { CityConfigValues } from '@/types/db'
 import type { BlockType } from '@/types/voxel'
 
 /** World units per voxel cell. */
@@ -22,7 +23,11 @@ export const CELL = 1
  * Build volume in cells — footprint matches the claimable lot so builds never
  * overhang neighbouring plots. Height stays tall for skyscrapers.
  */
-export const BUILDER_BOUNDS = { w: CITY_CONFIG.LOT, d: CITY_CONFIG.LOT, h: 100 } as const
+export const BUILDER_BOUNDS = { w: DEFAULT_CITY_CONFIG.LOT, d: DEFAULT_CITY_CONFIG.LOT, h: 100 } as const
+
+export function builderBoundsForConfig(cfg: CityConfigValues) {
+  return { w: cfg.LOT, d: cfg.LOT, h: 100 } as const
+}
 
 /** Raycast hit-distance cap (cells) — how far the player can reach to edit. */
 export const MAX_REACH = 12

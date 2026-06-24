@@ -1,24 +1,19 @@
 import { useMemo, useState } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
-import { CITY_CONFIG } from '@/constants/city'
 import { PALETTE } from '@/constants/palette'
 import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
+import { useWorldConfigStore } from '@/stores/worldConfigStore'
 import type { Plot } from '@/types/db'
 
-/**
- * Ground picker for placing a saved asset onto the owned plot — mounted only
- * while a placement is armed (PlotHud "place" mode). Reuses PlotField's
- * hover/click raycast pattern, but against a single plane sized to one lot. Hover
- * shows a cyan marker; click reports the world (x, z) up to the placement flow.
- */
 export function PlotGroundPicker({ plot, onPick }: { plot: Plot; onPick: (x: number, z: number) => void }) {
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
   const [hover, setHover] = useState<[number, number] | null>(null)
   const { cx, cz } = useMemo(
-    () => ({ cx: plotWorldX(plot.grid_x), cz: plotWorldZ(plot.grid_z) }),
-    [plot.grid_x, plot.grid_z],
+    () => ({ cx: plotWorldX(plot.grid_x, cityConfig), cz: plotWorldZ(plot.grid_z, cityConfig) }),
+    [plot.grid_x, plot.grid_z, cityConfig],
   )
-  const SIZE = CITY_CONFIG.LOT
+  const SIZE = cityConfig.LOT
 
   return (
     <group>
