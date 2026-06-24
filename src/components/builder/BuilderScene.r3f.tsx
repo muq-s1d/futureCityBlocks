@@ -256,7 +256,7 @@ export function BuilderScene() {
     for (const h of hits) {
       if (h.object === baseRef.current) {
         if (!groundHit) groundHit = h
-      } else if (h.instanceId != null) {
+      } else if (h.faceIndex != null) {
         if (!blockHit) { blockHit = h; break }
       }
     }
@@ -278,8 +278,8 @@ export function BuilderScene() {
         hl.position.set((gx + 0.5) * CELL, 0.5 * CELL, (gz + 0.5) * CELL)
       }
       setCrosshair('#ffffff')
-    } else if (chosen.instanceId != null) {
-      const block = voxelRef.current?.pickCell(chosen.object, chosen.instanceId)
+    } else if (chosen.faceIndex != null) {
+      const block = voxelRef.current?.pickCell(chosen)
       const n = chosen.face?.normal
       if (block && n) {
         // face.normal is geometry-local; safe while the builder group has no rotation.
