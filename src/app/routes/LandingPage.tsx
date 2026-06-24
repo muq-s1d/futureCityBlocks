@@ -443,7 +443,9 @@ export default function LandingPage() {
 
   return (
     <div ref={rootRef} className="relative overflow-x-hidden">
-      <TargetCursor targetSelector=".cursor-target" hideDefaultCursor spinDuration={3} />
+      {stage !== 'builder' && (
+        <TargetCursor targetSelector=".cursor-target" hideDefaultCursor spinDuration={3} />
+      )}
       <CityBackdrop
         progress={scrollProgress}
         approach={approach}

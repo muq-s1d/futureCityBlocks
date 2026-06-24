@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { VoxelBlocksMesh, type VoxelBlocksHandle } from '@/components/r3f/VoxelBlocksMesh.r3f'
 import { BlockHighlight } from '@/components/builder/BlockHighlight.r3f'
 import {
+  BLOCK_COLOR,
   builderArrivalPose,
   BUILDER_BOUNDS,
   CELL,
@@ -63,9 +64,10 @@ export function BuilderScene() {
   const introDone = useRef(false)
   const lockedRef = useRef(false)
   const keys = useRef<Record<string, boolean>>({})
-  const frame = useRef(0)
   // Last raycast result, read by the click handlers.
   const hit = useRef({ kind: 'none' as HitKind, cx: 0, cy: 0, cz: 0, px: 0, py: 0, pz: 0 })
+  const lastCrosshair = useRef('')
+  const tmpColor = useMemo(() => new THREE.Color(), [])
 
   // Home pose: in front of (+z) and above the plot, looking down at its centre.
   const home = useMemo(() => {
@@ -104,7 +106,7 @@ export function BuilderScene() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!lockedRef.current) return
       keys.current[e.code] = true
-      if (e.code === 'Space') e.preventDefault()
+      e.preventDefault()
     }
     const onKeyUp = (e: KeyboardEvent) => {
       keys.current[e.code] = false
@@ -158,6 +160,13 @@ export function BuilderScene() {
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), [])
   const euler = useMemo(() => new THREE.Euler(0, 0, 0, 'YXZ'), [])
   const moveVec = useMemo(() => new THREE.Vector3(), [])
+
+  const setCrosshair = (c: string) => {
+    if (lastCrosshair.current !== c) {
+      lastCrosshair.current = c
+      document.documentElement.style.setProperty('--crosshair-color', c)
+    }
+  }
 
   useFrame((_, dt) => {
     // Initialise from wherever the plot fly-in parked the camera (no snap), then
@@ -220,14 +229,14 @@ export function BuilderScene() {
     euler.set(pitch.current, yaw.current, 0)
     camera.quaternion.setFromEuler(euler)
 
-    // Centre-crosshair raycast (every 2nd frame; cheap scene but keeps headroom).
+    // Centre-crosshair raycast — every frame while locked so the click handlers
+    // always read a fresh hit (no stale-by-one-frame placement errors).
     const hl = highlightRef.current
     if (!locked) {
       if (hl) hl.visible = false
+      setCrosshair('#ffffff')
       return
     }
-    frame.current++
-    if (frame.current % 2 !== 0) return
 
     raycaster.setFromCamera(screenCentre, camera)
     const targets: THREE.Object3D[] = []
@@ -236,38 +245,53 @@ export function BuilderScene() {
     if (meshes) for (const m of meshes) if (m) targets.push(m)
 
     const hits = raycaster.intersectObjects(targets, false)
-    const first = hits[0]
-    if (!first) {
+
+    // Prefer block hits for placement so the baseplate can't steal the target
+    // when the crosshair lands just past a block's top edge.
+    let blockHit: THREE.Intersection | undefined
+    let groundHit: THREE.Intersection | undefined
+    for (const h of hits) {
+      if (h.object === baseRef.current) {
+        if (!groundHit) groundHit = h
+      } else if (h.instanceId != null) {
+        if (!blockHit) { blockHit = h; break }
+      }
+    }
+    const chosen = blockHit ?? groundHit
+
+    if (!chosen) {
       hit.current.kind = 'none'
       if (hl) hl.visible = false
+      setCrosshair('#ffffff')
       return
     }
 
-    if (first.object === baseRef.current) {
-      const gx = THREE.MathUtils.clamp(Math.floor((first.point.x - originX) / CELL), 0, W - 1)
-      const gz = THREE.MathUtils.clamp(Math.floor((first.point.z - originZ) / CELL), 0, D - 1)
+    if (chosen === groundHit && chosen.object === baseRef.current) {
+      const gx = THREE.MathUtils.clamp(Math.floor((chosen.point.x - originX) / CELL), 0, W - 1)
+      const gz = THREE.MathUtils.clamp(Math.floor((chosen.point.z - originZ) / CELL), 0, D - 1)
       hit.current = { kind: 'ground', cx: gx, cy: 0, cz: gz, px: gx, py: 0, pz: gz }
       if (hl) {
         hl.visible = true
         hl.position.set((gx + 0.5) * CELL, 0.5 * CELL, (gz + 0.5) * CELL)
       }
-    } else if (first.instanceId != null) {
-      const block = voxelRef.current?.pickCell(first.object, first.instanceId)
-      const n = first.face?.normal
+      setCrosshair('#ffffff')
+    } else if (chosen.instanceId != null) {
+      const block = voxelRef.current?.pickCell(chosen.object, chosen.instanceId)
+      const n = chosen.face?.normal
       if (block && n) {
-        hit.current = {
-          kind: 'block',
-          cx: block.x,
-          cy: block.y,
-          cz: block.z,
-          px: block.x + Math.round(n.x),
-          py: block.y + Math.round(n.y),
-          pz: block.z + Math.round(n.z),
-        }
+        // face.normal is geometry-local; safe while the builder group has no rotation.
+        const px = block.x + Math.round(n.x)
+        const py = block.y + Math.round(n.y)
+        const pz = block.z + Math.round(n.z)
+        hit.current = { kind: 'block', cx: block.x, cy: block.y, cz: block.z, px, py, pz }
         if (hl) {
-          hl.visible = true
-          hl.position.set((block.x + 0.5) * CELL, (block.y + 0.5) * CELL, (block.z + 0.5) * CELL)
+          const inBounds = px >= 0 && px < W && py >= 0 && py < H && pz >= 0 && pz < D
+          hl.visible = inBounds
+          hl.position.set((px + 0.5) * CELL, (py + 0.5) * CELL, (pz + 0.5) * CELL)
         }
+        tmpColor.set(block.color ?? BLOCK_COLOR[block.type])
+        const lum = 0.299 * tmpColor.r + 0.587 * tmpColor.g + 0.114 * tmpColor.b
+        setCrosshair(lum > 0.45 ? '#000000' : '#ffffff')
       }
     }
   })

@@ -26,11 +26,18 @@ export function BuilderHud() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-40 select-none">
-      {/* Crosshair */}
+      {/* Crosshair — color adapts to the block under the centre ray via a CSS
+          variable set each frame by BuilderScene's raycast. */}
       {locked && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className="absolute h-5 w-px -translate-x-1/2 -translate-y-1/2 bg-cyan/80" />
-          <div className="absolute h-px w-5 -translate-x-1/2 -translate-y-1/2 bg-cyan/80" />
+          <div
+            className="absolute h-6 w-0.5 -translate-x-1/2 -translate-y-1/2"
+            style={{ backgroundColor: 'var(--crosshair-color, #fff)' }}
+          />
+          <div
+            className="absolute h-0.5 w-6 -translate-x-1/2 -translate-y-1/2"
+            style={{ backgroundColor: 'var(--crosshair-color, #fff)' }}
+          />
         </div>
       )}
 

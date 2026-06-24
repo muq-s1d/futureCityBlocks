@@ -42,9 +42,9 @@ const COUNT = COLS * ROWS
 // NEIGHBORHOOD clearing deeper down where the claimable plots live — so the
 // camera flies cleanly down the street and the plots never overlap the towers.
 const SKYLINE_START = -6
-const CORRIDOR_HALF_X = 22 // central highway kept clear of towers
-const CLEARING_NEAR_Z = -150 // skyline removed between here…
-const CLEARING_FAR_Z = -300 // …and here, leaving room for the neighborhood
+const CORRIDOR_HALF_X = 30 // central highway kept clear of towers
+const CLEARING_NEAR_Z = -160 // skyline removed between here…
+const CLEARING_FAR_Z = -540 // …and here, leaving room for the neighborhood
 
 // The claimable lot-and-block grid is already in world space (see cityGrid), so
 // no extra offset is needed.
@@ -63,7 +63,7 @@ const NIGHT = {
   bg: new THREE.Color(PALETTE.void),
   fog: new THREE.Color(PALETTE.purple),
   fogNear: 45,
-  fogFar: 300,
+  fogFar: 500,
   amb: 0.28,
   dir: 0.55,
   dirColor: new THREE.Color(PALETTE.cyan),
@@ -72,7 +72,7 @@ const DAY = {
   bg: new THREE.Color('#2a2140'),
   fog: new THREE.Color('#3a2f55'),
   fogNear: 80,
-  fogFar: 480,
+  fogFar: 650,
   amb: 0.66,
   dir: 1.0,
   dirColor: new THREE.Color('#ffd9a0'),
@@ -289,9 +289,9 @@ export function CityField({
       // skim other lots. Instead route in two legs that never leave the band:
       //   leg 1 — pull back onto the highway corridor at the plot's depth, high up
       //   leg 2 — descend laterally from the road onto the plot.
-      stagePos.set(side * 13, 20, wz)
+      stagePos.set(side * 18, 28, wz)
       stageTgt.set(wx, 1, wz)
-      arrivePos.set(wx - side * 12, 7, wz + 8)
+      arrivePos.set(wx - side * 18, 14, wz + 20)
       arriveTgt.set(wx, 0.6, wz)
 
       const leg1 = Math.min(pl / 0.5, 1)
@@ -354,7 +354,7 @@ export function CityField({
       <PerformanceMonitor onDecline={() => downgrade()} />
 
       <color ref={bgRef} attach="background" args={[PALETTE.void]} />
-      <fog ref={fogRef} attach="fog" args={[PALETTE.purple, 45, 300]} />
+      <fog ref={fogRef} attach="fog" args={[PALETTE.purple, 45, 500]} />
       <ambientLight ref={ambRef} intensity={0.28} />
       <directionalLight ref={dirRef} position={[40, 90, 30]} intensity={0.55} color={PALETTE.cyan} />
       <hemisphereLight args={[PALETTE.magenta, PALETTE.void, 0.35]} />
@@ -384,6 +384,7 @@ export function CityField({
               plots={plots}
               ownedPlotId={ownedPlot?.id ?? null}
               reserve={STOREFRONT_RESERVE}
+              hideBeacon={stage === 'builder'}
             />
             {/* Placed assets show on the plot AND as context while building. */}
             {(stage === 'plot' || stage === 'builder') &&

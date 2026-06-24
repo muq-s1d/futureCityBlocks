@@ -82,6 +82,7 @@ export const VoxelBlocksMesh = forwardRef<VoxelBlocksHandle, { blocks: VoxelBloc
         mesh.count = bucket.length
         mesh.instanceMatrix.needsUpdate = true
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+        mesh.computeBoundingSphere()
         cellMaps.current[ti] = map
       })
     }, [byType])

@@ -18,9 +18,9 @@ export const CITY_CONFIG = {
   // blocks of lots flanking BOTH sides. Within a block, lots are separated by a
   // thin ALLEY; blocks are separated by a wider STREET. Columns 0–9 sit left of
   // the highway, 10–19 to the right; rows run away into depth (−z).
-  LOT: 8, // plot footprint (world units)
-  ALLEY: 2, // gap between lots inside a block
-  STREET: 9, // road between blocks (and between highway and first block)
+  LOT: 25, // plot footprint (world units)
+  ALLEY: 6, // gap between lots inside a block
+  STREET: 42, // road between blocks (and between highway and first block)
   CORRIDOR_HALF: 15, // half-width of the central highway
   NEAR: 172, // depth of the first row of lots — sits BEHIND the near skyline, in
   // the clearing carved through it (see CityField CLEARING_NEAR_Z/FAR_Z)

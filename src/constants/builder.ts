@@ -12,40 +12,38 @@
  * in-family hues, not arbitrary off-palette colours.
  */
 import { PALETTE } from '@/constants/palette'
+import { CITY_CONFIG } from '@/constants/city'
 import type { BlockType } from '@/types/voxel'
 
 /** World units per voxel cell. */
 export const CELL = 1
 
 /**
- * Build volume in cells — a generous 40×40 footprint and 100 cells tall, so
- * players can raise full skyscrapers, not just lot-sized structures. This is the
- * builder's editing space; it's larger than a city LOT (8u), so big builds will
- * overhang neighbouring lots when placed back on the plot (intended — skyscrapers
- * are meant to be big). The hard cap on rendered instances (VoxelBlocksMesh) is
- * decoupled from this volume so an empty builder doesn't preallocate 160k cubes.
+ * Build volume in cells — footprint matches the claimable lot so builds never
+ * overhang neighbouring plots. Height stays tall for skyscrapers.
  */
-export const BUILDER_BOUNDS = { w: 40, d: 40, h: 100 } as const
+export const BUILDER_BOUNDS = { w: CITY_CONFIG.LOT, d: CITY_CONFIG.LOT, h: 100 } as const
 
 /** Raycast hit-distance cap (cells) — how far the player can reach to edit. */
 export const MAX_REACH = 12
 
-/** Fly speed (world units / second) for WASD + vertical movement. Scaled up for
- *  the larger volume so crossing the 100-tall space doesn't crawl. */
-export const FLY_SPEED = 16
+/** Fly speed (world units / second) for WASD + vertical movement. */
+export const FLY_SPEED = 10
 
 /**
  * Camera arrival/home pose for a plot at world (cx, cz): pulled back and up to
- * frame the big build box. Shared by CityField's fly-in leg and BuilderScene's
+ * frame the tall build volume. Shared by CityField's fly-in leg and BuilderScene's
  * FPS home so the hand-off (and the return on exit) is seamless.
  */
 export function builderArrivalPose(
   cx: number,
   cz: number,
 ): { pos: [number, number, number]; tgt: [number, number, number] } {
+  const { w, h } = BUILDER_BOUNDS
+  const back = Math.max(h * 0.55, w * 2)
   return {
-    pos: [cx, BUILDER_BOUNDS.h * 0.25, cz + BUILDER_BOUNDS.w * 1.1],
-    tgt: [cx, BUILDER_BOUNDS.h * 0.2, cz],
+    pos: [cx, h * 0.45, cz + back],
+    tgt: [cx, h * 0.35, cz],
   }
 }
 

@@ -38,12 +38,14 @@ export function PlotField({
   plots,
   ownedPlotId = null,
   reserve,
+  hideBeacon = false,
   onHover,
   onSelect,
 }: {
   plots: Plot[]
   ownedPlotId?: number | null
   reserve?: ReserveRect
+  hideBeacon?: boolean
   onHover?: (plot: Plot | null) => void
   onSelect?: (plot: Plot) => void
 }) {
@@ -160,7 +162,7 @@ export function PlotField({
         </mesh>
       )}
 
-      {owned && (
+      {owned && !hideBeacon && (
         <group>
           {/* Light shaft marking the owned plot from afar. */}
           <mesh ref={beaconRef} position={[plotWorldX(owned.grid_x), 16, plotWorldZ(owned.grid_z)]}>
