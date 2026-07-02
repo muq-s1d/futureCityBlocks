@@ -118,6 +118,74 @@ export async function loadPlotObjects(plotId: number): Promise<PlacedAsset[]> {
   return (data ?? []) as PlacedAsset[]
 }
 
+/** Update an existing asset's name, voxel data, and thumbnail. */
+export async function updateAsset(
+  id: string,
+  name: string,
+  blocks: VoxelBlock[],
+  thumbnailDataUrl: string,
+): Promise<Asset> {
+  requireConfigured()
+  const ownerId = requireUserId()
+
+  let thumbnailUrl: string | null = null
+  if (thumbnailDataUrl) {
+    const path = `${ownerId}/${id}.png`
+    const { error: upErr } = await supabase.storage
+      .from(THUMB_BUCKET)
+      .upload(path, dataUrlToBytes(thumbnailDataUrl), { contentType: 'image/png', upsert: true })
+    if (upErr) throw upErr
+    thumbnailUrl = supabase.storage.from(THUMB_BUCKET).getPublicUrl(path).data.publicUrl
+  }
+
+  const { data, error } = await supabase
+    .from('assets')
+    .update({ name, voxel_data: blocks, thumbnail: thumbnailUrl })
+    .eq('id', id)
+    .eq('owner_id', ownerId)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as Asset
+}
+
+/** Delete an asset and all plot_objects referencing it, plus its thumbnail. */
+export async function deleteAsset(id: string): Promise<void> {
+  requireConfigured()
+  const ownerId = requireUserId()
+
+  const { error: poErr } = await supabase.from('plot_objects').delete().eq('asset_id', id)
+  if (poErr) throw poErr
+
+  const { error } = await supabase.from('assets').delete().eq('id', id).eq('owner_id', ownerId)
+  if (error) throw error
+
+  await supabase.storage.from(THUMB_BUCKET).remove([`${ownerId}/${id}.png`])
+}
+
+/** Partially update a placed object (position, rotation). */
+export async function updatePlotObject(
+  id: string,
+  updates: { pos_x?: number; pos_y?: number; pos_z?: number; rot_y?: number },
+): Promise<PlotObject> {
+  requireConfigured()
+  const { data, error } = await supabase
+    .from('plot_objects')
+    .update(updates)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as PlotObject
+}
+
+/** Remove a placed object from a plot. */
+export async function deletePlotObject(id: string): Promise<void> {
+  requireConfigured()
+  const { error } = await supabase.from('plot_objects').delete().eq('id', id)
+  if (error) throw error
+}
+
 /**
  * Subscribe to live changes to a plot's objects (Supabase Realtime).
  *

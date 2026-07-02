@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useWorldConfigStore } from '@/stores/worldConfigStore'
 import { fallbackPlots } from '@/lib/cityGrid'
 import type { Plot } from '@/types/db'
+import type { VoxelBlock } from '@/types/voxel'
 
 /** Load all plots into the store; falls back to a local grid if the DB is out. */
 export async function loadCityPlots(): Promise<void> {
@@ -41,4 +42,26 @@ export async function claimPlot(district: string): Promise<Plot> {
   useAuthStore.getState().setOwnedPlot(plot)
   useCityStore.getState().upsertPlot(plot)
   return plot
+}
+
+/** Load a plot's voxel blocks. */
+export async function loadPlotBlocks(plotId: number): Promise<VoxelBlock[]> {
+  if (!isSupabaseConfigured) return []
+  const { data, error } = await supabase
+    .from('plots')
+    .select('voxel_data')
+    .eq('id', plotId)
+    .single()
+  if (error) throw error
+  return (data?.voxel_data ?? []) as VoxelBlock[]
+}
+
+/** Save a plot's voxel blocks. */
+export async function savePlotBlocks(plotId: number, blocks: VoxelBlock[]): Promise<void> {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase
+    .from('plots')
+    .update({ voxel_data: blocks })
+    .eq('id', plotId)
+  if (error) throw error
 }

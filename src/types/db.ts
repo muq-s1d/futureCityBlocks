@@ -17,6 +17,7 @@ export interface Plot {
   grid_z: number
   name: string
   claimed_at: string | null
+  voxel_data: VoxelBlock[]
 }
 
 export interface CityConfigValues {

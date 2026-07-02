@@ -1,7 +1,8 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useMemo, type RefObject } from 'react'
 import { PerformanceMonitor } from '@react-three/drei'
 import * as THREE from 'three'
 import { PALETTE } from '@/constants/palette'
+import { CELL } from '@/constants/builder'
 import { HighwaySign } from '@/components/r3f/HighwaySign.r3f'
 import { AuthKiosk } from '@/components/r3f/AuthKiosk.r3f'
 import { CameraRig } from '@/components/r3f/CameraRig.r3f'
@@ -12,10 +13,9 @@ import { Storefront } from '@/components/city/Storefront.r3f'
 import { StorefrontAtmosphere } from '@/components/city/StorefrontAtmosphere.r3f'
 import { StorefrontDashboard } from '@/components/city/StorefrontDashboard.r3f'
 import { BuilderScene } from '@/components/builder/BuilderScene.r3f'
-import { AssetMesh } from '@/components/r3f/AssetMesh.r3f'
-import { PlotGroundPicker } from '@/components/city/PlotGroundPicker.r3f'
-import type { PlacedAsset } from '@/lib/assets'
+import { VoxelBlocksMesh } from '@/components/r3f/VoxelBlocksMesh.r3f'
 import { loadCityPlots } from '@/lib/city'
+import { plotWorldX, plotWorldZ } from '@/lib/cityGrid'
 import { useCityStore } from '@/stores/cityStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useQualityStore } from '@/stores/qualityStore'
@@ -26,6 +26,28 @@ const CITY_OFFSET = new THREE.Vector3(0, 0, 0)
 const STOREFRONT_POS: [number, number, number] = [-24, 0, -212]
 const STOREFRONT_RESERVE: ReserveRect = { minX: -40, maxX: -8, minZ: -232, maxZ: -192 }
 
+function PlotBlocks({ stage }: { stage: WorldStage }) {
+  const ownedPlot = useAuthStore((s) => s.ownedPlot)
+  const cityConfig = useWorldConfigStore((s) => s.cityConfig)
+
+  const origin = useMemo(() => {
+    if (!ownedPlot) return null
+    const wx = plotWorldX(ownedPlot.grid_x, cityConfig)
+    const wz = plotWorldZ(ownedPlot.grid_z, cityConfig)
+    const W = cityConfig.LOT
+    return [wx - (W * CELL) / 2, 0, wz - (W * CELL) / 2] as [number, number, number]
+  }, [ownedPlot, cityConfig])
+
+  if (!ownedPlot || !origin || stage === 'builder') return null
+  if (!ownedPlot.voxel_data || ownedPlot.voxel_data.length === 0) return null
+
+  return (
+    <group position={origin}>
+      <VoxelBlocksMesh blocks={ownedPlot.voxel_data} />
+    </group>
+  )
+}
+
 export function CityField({
   progress,
   approach,
@@ -35,13 +57,10 @@ export function CityField({
   toBuilder,
   stage,
   authActive,
-  placedObjects,
-  placing,
   onAuthSuccess,
   onEnterPlot,
   onSignOut,
   onRequestDelete,
-  onGroundPick,
 }: {
   progress: RefObject<number>
   approach: RefObject<number>
@@ -51,13 +70,10 @@ export function CityField({
   toBuilder: RefObject<number>
   stage: WorldStage
   authActive: boolean
-  placedObjects: PlacedAsset[]
-  placing: boolean
   onAuthSuccess: () => void
   onEnterPlot: (districtId: string) => void
   onSignOut: () => void
   onRequestDelete: () => void
-  onGroundPick: (x: number, z: number) => void
 }) {
   const plots = useCityStore((s) => s.plots)
   const weather = useCityStore((s) => s.weather)
@@ -105,11 +121,7 @@ export function CityField({
               reserve={STOREFRONT_RESERVE}
               hideBeacon={stage === 'builder'}
             />
-            {(stage === 'plot' || stage === 'builder') &&
-              placedObjects.map((obj) => <AssetMesh key={obj.id} object={obj} />)}
-            {placing && stage === 'plot' && ownedPlot && (
-              <PlotGroundPicker plot={ownedPlot} onPick={onGroundPick} />
-            )}
+            <PlotBlocks stage={stage} />
           </group>
 
           {stage === 'builder' && <BuilderScene />}

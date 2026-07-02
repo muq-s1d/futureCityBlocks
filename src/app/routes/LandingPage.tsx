@@ -12,14 +12,12 @@ import { EnvHud } from '@/components/city/EnvHud'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { BuilderHud } from '@/components/builder/BuilderHud'
 import { BuilderPauseMenu } from '@/components/builder/BuilderPauseMenu'
-import { AssetLibraryPanel } from '@/components/builder/AssetLibraryPanel'
 import { useAuthStore } from '@/stores/authStore'
-import { usePlotObjects } from '@/hooks/usePlotObjects'
+import { useBuilderStore } from '@/stores/builderStore'
 import { useStageRouter } from '@/hooks/useStageRouter'
 import { useLandingScroll } from '@/hooks/useLandingScroll'
-import { placeAssetOnPlot } from '@/lib/assets'
+import { loadPlotBlocks, savePlotBlocks } from '@/lib/city'
 import { signOut, deleteAccount } from '@/lib/auth'
-import type { Asset } from '@/types/db'
 
 export default function LandingPage() {
   const ownedPlot = useAuthStore((s) => s.ownedPlot)
@@ -49,33 +47,37 @@ export default function LandingPage() {
     resetToLanding,
   } = router
 
-  // Plot objects (placed assets) — shared between plot view and builder context.
-  const { objects: placedObjects, refresh: refreshPlotObjects } = usePlotObjects(
-    ownedPlot?.id ?? null,
-  )
-
-  // Asset placement flow
-  const [placeLibraryOpen, setPlaceLibraryOpen] = useState(false)
-  const [placing, setPlacing] = useState(false)
-  const armedAsset = useRef<Asset | null>(null)
-
-  const armPlacement = (asset: Asset) => {
-    armedAsset.current = asset
-    setPlaceLibraryOpen(false)
-    setPlacing(true)
+  const enterBuilder = () => {
+    if (!ownedPlot) return
+    const store = useBuilderStore.getState()
+    store.setPlotId(ownedPlot.id)
+    loadPlotBlocks(ownedPlot.id)
+      .then((blocks) => {
+        store.loadBlocks(blocks)
+        handleEnterBuilder()
+      })
+      .catch(() => {
+        store.loadBlocks(ownedPlot.voxel_data ?? [])
+        handleEnterBuilder()
+      })
   }
-  const cancelPlacement = () => {
-    armedAsset.current = null
-    setPlacing(false)
-  }
-  const handleGroundPick = (x: number, z: number) => {
-    const asset = armedAsset.current
-    if (!asset || !ownedPlot) return
-    setPlacing(false)
-    armedAsset.current = null
-    placeAssetOnPlot(ownedPlot.id, asset.id, x, 0, z)
-      .then(() => refreshPlotObjects())
-      .catch((err) => console.error('placeAssetOnPlot failed', err))
+
+  const exitBuilder = async () => {
+    const store = useBuilderStore.getState()
+    if (store.mode === 'template') store.setMode('build')
+    const plotId = store.plotId
+    const blocks = [...store.blocks]
+    if (plotId != null) {
+      try {
+        await savePlotBlocks(plotId, blocks)
+      } catch (err) {
+        console.error('savePlotBlocks failed', err)
+      }
+    }
+    if (ownedPlot) {
+      useAuthStore.getState().setOwnedPlot({ ...ownedPlot, voxel_data: blocks })
+    }
+    handleExitBuilder(async () => {})
   }
 
   // Auth actions
@@ -113,13 +115,10 @@ export default function LandingPage() {
         stage={stage}
         interactive={entering}
         authActive={stage === 'auth'}
-        placedObjects={placedObjects}
-        placing={placing}
         onAuthSuccess={handleAuthSuccess}
         onEnterPlot={handleEnterPlot}
         onSignOut={handleSignOut}
         onRequestDelete={() => setDeleteOpen(true)}
-        onGroundPick={handleGroundPick}
       />
       <Atmosphere fading={entering} />
       {!entering && <HudFrame progress={scrollProgress} />}
@@ -147,33 +146,8 @@ export default function LandingPage() {
       {stage === 'builder' && (
         <>
           <BuilderHud />
-          <BuilderPauseMenu onExit={() => handleExitBuilder(refreshPlotObjects)} />
+          <BuilderPauseMenu onExit={exitBuilder} />
         </>
-      )}
-
-      {placeLibraryOpen && stage === 'plot' && (
-        <AssetLibraryPanel
-          title="Place an asset"
-          hint="Pick a saved asset, then click a spot on your plot"
-          onPick={armPlacement}
-          onClose={() => setPlaceLibraryOpen(false)}
-        />
-      )}
-
-      {placing && stage === 'plot' && (
-        <div className="pointer-events-none fixed top-24 left-1/2 z-40 -translate-x-1/2 select-none">
-          <div className="hud-panel pointer-events-auto flex items-center gap-4 px-6 py-3">
-            <span className="font-mono text-xs tracking-[0.2em] text-cyan uppercase">
-              Click a spot on your plot to place it
-            </span>
-            <button
-              onClick={cancelPlacement}
-              className="font-mono text-[11px] tracking-[0.25em] text-magenta/80 uppercase transition-colors hover:text-magenta"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
       )}
 
       <ConfirmDialog
@@ -194,8 +168,7 @@ export default function LandingPage() {
         <PlotHud
           onBackToCity={handleBackToCity}
           onBackToLanding={handleBack}
-          onEnterBuilder={handleEnterBuilder}
-          onPlaceAsset={() => setPlaceLibraryOpen(true)}
+          onEnterBuilder={enterBuilder}
         />
       )}
 

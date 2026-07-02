@@ -2,19 +2,26 @@ import { useEffect } from 'react'
 import { BLOCK_COLOR, BLOCK_LABEL, BLOCK_TYPES } from '@/constants/builder'
 import { useBuilderStore } from '@/stores/builderStore'
 
-/**
- * DOM overlay for the voxel builder: a centre crosshair (only while locked), the
- * 7-slot hotbar (click, or number keys 1–7), and the first-run "CLICK TO BUILD"
- * prompt that requests pointer lock (a real user gesture — see BuilderScene).
- */
+const MODE_LABEL = {
+  build: 'BUILD MODE',
+  template: 'ASSET BUILDER',
+} as const
+
+const MODE_HINT = {
+  build: 'Tab = asset library · F = fill · Ctrl+Z undo · Esc = pause',
+  template: 'Creating a reusable template · Esc = save/exit',
+} as const
+
 export function BuilderHud() {
   const locked = useBuilderStore((s) => s.locked)
   const engaged = useBuilderStore((s) => s.engaged)
   const selected = useBuilderStore((s) => s.selectedBlockType)
   const setSelected = useBuilderStore((s) => s.setSelectedBlockType)
   const requestLock = useBuilderStore((s) => s.requestLock)
+  const fillMode = useBuilderStore((s) => s.fillMode)
+  const mode = useBuilderStore((s) => s.mode)
+  const armedAsset = useBuilderStore((s) => s.armedAsset)
 
-  // Number keys 1–7 select the hotbar slot (works while pointer-locked too).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const n = Number.parseInt(e.key, 10)
@@ -24,10 +31,26 @@ export function BuilderHud() {
     return () => window.removeEventListener('keydown', onKey)
   }, [setSelected])
 
+  const displayMode = armedAsset ? 'PLACE ASSET' : MODE_LABEL[mode]
+  const displayHint = armedAsset
+    ? 'Right-click to stamp · Q/E rotate · Left-click/Esc cancel'
+    : MODE_HINT[mode]
+
   return (
     <div className="pointer-events-none fixed inset-0 z-40 select-none">
-      {/* Crosshair — color adapts to the block under the centre ray via a CSS
-          variable set each frame by BuilderScene's raycast. */}
+      {/* Mode indicator — always visible at top center */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 text-center">
+        <div className="font-display text-sm font-bold tracking-[0.3em] text-cyan uppercase">
+          {displayMode}
+        </div>
+        {locked && (
+          <div className="mt-1 font-mono text-[10px] tracking-[0.15em] text-cyan/50 uppercase">
+            {displayHint}
+          </div>
+        )}
+      </div>
+
+      {/* Crosshair */}
       {locked && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
           <div
@@ -38,10 +61,15 @@ export function BuilderHud() {
             className="absolute h-0.5 w-6 -translate-x-1/2 -translate-y-1/2"
             style={{ backgroundColor: 'var(--crosshair-color, #fff)' }}
           />
+          {fillMode && (
+            <span className="absolute top-4 left-4 font-mono text-[10px] font-bold tracking-[0.25em] text-cyan uppercase">
+              FILL
+            </span>
+          )}
         </div>
       )}
 
-      {/* First-run prompt — clicking anywhere requests pointer lock. */}
+      {/* First-run prompt */}
       {!locked && !engaged && (
         <button
           onClick={() => requestLock?.()}
@@ -52,7 +80,7 @@ export function BuilderHud() {
           </span>
           <span className="max-w-md text-center font-mono text-xs leading-relaxed tracking-[0.2em] text-cyan/70 uppercase">
             WASD to fly · mouse to look · space / shift up &amp; down · left-click breaks ·
-            right-click places · 1–7 pick block · esc to pause
+            right-click places · 1–7 pick block · Tab asset library · F fill · Ctrl+Z undo · Esc pause
           </span>
         </button>
       )}

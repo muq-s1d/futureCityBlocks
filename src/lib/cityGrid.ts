@@ -49,6 +49,7 @@ export function fallbackPlots(
         grid_z: gz,
         name: 'Unclaimed Plot',
         claimed_at: null,
+        voxel_data: [],
       })
     }
   }

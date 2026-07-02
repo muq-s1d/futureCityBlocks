@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { NeonButton } from '@/components/ui/NeonButton'
 import { useBuilderStore } from '@/stores/builderStore'
+import { updateAsset } from '@/lib/assets'
+import type { Asset } from '@/types/db'
 
-/**
- * Name-and-save modal for the voxel builder. Same shell/keyboard handling as
- * ConfirmDialog, with a text input. Confirm runs builderStore.saveAsset(name),
- * which captures the thumbnail (the canvas is still showing the framed build —
- * this DOM modal doesn't touch the WebGL buffer) and inserts the assets row.
- */
 export function NameAssetDialog({
   open,
   onClose,
   onSaved,
+  editingAsset,
 }: {
   open: boolean
   onClose: () => void
   onSaved?: () => void
+  editingAsset?: Asset | null
 }) {
   const saveAsset = useBuilderStore((s) => s.saveAsset)
-  const blockCount = useBuilderStore((s) => s.blocks.length)
+  const blocks = useBuilderStore((s) => s.blocks)
+  const capture = useBuilderStore((s) => s.capture)
+  const blockCount = blocks.length
   const inputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -26,9 +26,8 @@ export function NameAssetDialog({
 
   useEffect(() => {
     if (!open) return
-    // Reset the form each time the dialog opens (intentional sync setState).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setName('')
+    setName(editingAsset?.name ?? '')
     setError(null)
     setBusy(false)
     inputRef.current?.focus()
@@ -44,21 +43,36 @@ export function NameAssetDialog({
 
   const canSave = name.trim().length > 0 && blockCount > 0 && !busy
 
-  const submit = () => {
+  const finish = () => {
+    setBusy(false)
+    onSaved?.()
+    onClose()
+  }
+
+  const handleError = (err: unknown) => {
+    console.error('save failed', err)
+    setError(err instanceof Error ? err.message : 'Save failed — try again.')
+    setBusy(false)
+  }
+
+  const handleOverwrite = () => {
+    if (!canSave || !editingAsset) return
+    setBusy(true)
+    setError(null)
+    const thumbnail = capture?.() ?? ''
+    updateAsset(editingAsset.id, name.trim(), blocks, thumbnail)
+      .then(() => {
+        useBuilderStore.getState().clearAll()
+        finish()
+      })
+      .catch(handleError)
+  }
+
+  const handleSaveNew = () => {
     if (!canSave) return
     setBusy(true)
     setError(null)
-    saveAsset(name.trim())
-      .then(() => {
-        setBusy(false)
-        onSaved?.()
-        onClose()
-      })
-      .catch((err: unknown) => {
-        console.error('saveAsset failed', err)
-        setError(err instanceof Error ? err.message : 'Save failed — try again.')
-        setBusy(false)
-      })
+    saveAsset(name.trim()).then(finish).catch(handleError)
   }
 
   return (
@@ -75,18 +89,19 @@ export function NameAssetDialog({
       />
       <div className="hud-panel relative z-10 w-full max-w-md rounded-sm p-7">
         <h2 id="save-asset-title" className="font-display text-2xl font-bold tracking-wide text-cyan">
-          Save asset
+          {editingAsset ? 'Save changes' : 'Save asset'}
         </h2>
         <p className="mt-3 font-mono text-xs leading-relaxed tracking-[0.1em] text-muted uppercase">
-          Name this {blockCount}-block structure. It becomes a reusable template in
-          your Asset Library.
+          {editingAsset
+            ? `Editing "${editingAsset.name}" — overwrite the original or save as a new asset.`
+            : `Name this ${blockCount}-block structure. It becomes a reusable template in your Asset Library.`}
         </p>
 
         <input
           ref={inputRef}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          onKeyDown={(e) => e.key === 'Enter' && (editingAsset ? handleOverwrite() : handleSaveNew())}
           maxLength={48}
           placeholder="e.g. Neon Spire"
           className="mt-5 w-full border border-border bg-void/60 px-4 py-3 font-mono text-sm text-cyan placeholder:text-muted focus:border-cyan focus:outline-none"
@@ -98,13 +113,23 @@ export function NameAssetDialog({
           <NeonButton accent="cyan" onClick={onClose} disabled={busy} className="px-6 py-3 text-xs">
             Cancel
           </NeonButton>
+          {editingAsset && (
+            <NeonButton
+              accent="amber"
+              onClick={handleOverwrite}
+              disabled={!canSave}
+              className="px-6 py-3 text-xs"
+            >
+              {busy ? 'Saving…' : `Overwrite "${editingAsset.name}"`}
+            </NeonButton>
+          )}
           <NeonButton
             accent="cyan"
-            onClick={submit}
+            onClick={handleSaveNew}
             disabled={!canSave}
             className="px-6 py-3 text-xs"
           >
-            {busy ? 'Saving…' : 'Save asset'}
+            {busy ? 'Saving…' : 'Save as new'}
           </NeonButton>
         </div>
       </div>

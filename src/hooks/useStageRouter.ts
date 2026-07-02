@@ -109,7 +109,6 @@ export function useStageRouter() {
 
   const handleEnterBuilder = () => {
     const b = useBuilderStore.getState()
-    b.clearAll()
     b.resetRuntime()
     setEnteringBuilder(true)
     if (reduced()) {
@@ -128,7 +127,6 @@ export function useStageRouter() {
   const handleExitBuilder = (refreshPlotObjects: () => Promise<void>) => {
     const b = useBuilderStore.getState()
     b.resetRuntime()
-    b.clearAll()
     setEnteringBuilder(false)
     setStage('plot')
     void refreshPlotObjects()

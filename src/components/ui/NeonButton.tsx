@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
-type Accent = 'cyan' | 'magenta'
+type Accent = 'cyan' | 'magenta' | 'amber'
 
 interface NeonButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   accent?: Accent
@@ -12,6 +12,7 @@ interface NeonButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const ACCENT: Record<Accent, string> = {
   cyan: 'border-cyan text-cyan hover:bg-cyan/10 hover:shadow-glow-cyan',
   magenta: 'border-magenta text-magenta hover:bg-magenta/10 hover:shadow-glow-magenta',
+  amber: 'border-amber text-amber hover:bg-amber/10',
 }
 
 /** Shared cyberpunk action button. Token-driven; reused by landing + auth. */
